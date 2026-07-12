@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mi-proyecto-django
+    env: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn core.wsgi:application --log-file -
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mi-db-postgres
+          property: connectionString
+databases:
+  - name: mi-db-postgres
+    plan: free
