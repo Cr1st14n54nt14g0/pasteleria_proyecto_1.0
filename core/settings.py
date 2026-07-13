@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'pasteleria_app',
 ]
 
 MIDDLEWARE = [
@@ -76,7 +77,8 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgres://postgres:postgres:postgres@localhost:5432/mi_db_local',
+        #default='postgres://postgres:postgres:postgres@localhost:5432/mi_db_local',
+        default='sqlite:///db.sqlite3',
         conn_max_age=600
     )
 }
