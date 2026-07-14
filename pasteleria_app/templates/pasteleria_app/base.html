@@ -7,20 +7,18 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { padding-top: 70px; }
+    body { padding-top: 10px; }
     .navbar-brand { font-weight: bold; }
     .nav-item.active a { background-color: #0d6efd; color: white !important; border-radius: 5px; }
   </style>
 </head>
 <body>
-
   <!-- Botón hamburguesa visible en móviles -->
   <div class="d-md-none bg-light p-2 border-bottom">
     <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">
       ☰ Menú
     </button>
   </div>
-
   <!-- Menú lateral fijo en pantallas grandes -->
   <div class="d-none d-md-block bg-light border-end vh-100 position-fixed" style="width: 220px;">
     <div class="p-3">
@@ -35,7 +33,6 @@
       </ul>
     </div>
   </div>
-
   <!-- Menú offcanvas solo para móviles -->
   <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebarMenu">
     <div class="offcanvas-header">
@@ -53,12 +50,10 @@
       </ul>
     </div>
   </div>
-
   <!-- Ajuste del contenido principal -->
-  <main class="container mt-4" style="margin-left: 240px;">
+  <main class="container mt-4" style="margin-left: 220px;">
     {% block content %}{% endblock %}
   </main>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
