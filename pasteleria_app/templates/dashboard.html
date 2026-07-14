@@ -1,0 +1,39 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Productos</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ total_productos }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Pedidos Totales</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ total_pedidos }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-header">Pedidos Pendientes</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ pedidos_pendientes }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger mb-3">
+            <div class="card-header">Ingresos</div>
+            <div class="card-body">
+                <h5 class="card-title">${{ ingresos|floatformat:2 }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
