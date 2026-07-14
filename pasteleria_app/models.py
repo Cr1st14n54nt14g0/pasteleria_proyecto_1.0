@@ -1,40 +1,64 @@
 from django.db import models
-from django.contrib.auth.models import User 
-
-# Create your models here.
-
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+ 
+# ------------------------------------------------------------
+# Modelos de negocio
+# ------------------------------------------------------------
+ 
 class DatosPersonales(models.Model):
     id_usuario = models.AutoField(primary_key=True)
     nombres = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)
     telefono = models.JSONField(blank=True, null=True)
     direccion = models.CharField(max_length=150, blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'datos_personales'
-
-
+ 
+ 
+class Productos(models.Model):
+    id_producto = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=100)
+    descripcion = models.CharField(max_length=255, blank=True, null=True)
+    precio = models.JSONField()
+    categoria = models.CharField(max_length=50)
+ 
+    class Meta:
+        db_table = 'productos'
+ 
+ 
+class Ventas(models.Model):
+    id_venta = models.AutoField(primary_key=True)
+    id_usuario = models.ForeignKey('Usuarios', models.DO_NOTHING, db_column='id_usuario')
+    id_pedido = models.ForeignKey('Pedidos', models.DO_NOTHING, db_column='id_pedido', blank=True, null=True)
+    fecha_venta = models.DateTimeField()
+    total = models.JSONField()
+    ticket = models.CharField(unique=True, max_length=50)
+ 
+    class Meta:
+        db_table = 'ventas'
+ 
+ 
 class DetalleVenta(models.Model):
-    id_venta = models.ForeignKey('Ventas', models.DO_NOTHING, db_column='id_venta')
-    id_producto = models.ForeignKey('Productos', models.DO_NOTHING, db_column='id_producto')
+    id_venta = models.ForeignKey(Ventas, models.DO_NOTHING, db_column='id_venta')
+    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
     cantidad = models.JSONField()
     ticket = models.CharField(max_length=50, blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'detalle_venta'
-
-
-
+ 
+ 
 class EquiposDeRefrigeracion(models.Model):
     id_equipo = models.AutoField(primary_key=True)
     nombre_equipo = models.CharField(unique=True, max_length=100)
     tipo = models.CharField(max_length=50)
     estado = models.CharField(max_length=17, blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'equipos_de_refrigeracion'
-
-
+ 
+ 
 class Insumos(models.Model):
     id_insumo = models.AutoField(primary_key=True)
     nombre_insumo = models.CharField(max_length=100)
@@ -43,21 +67,21 @@ class Insumos(models.Model):
     cantidad = models.JSONField()
     fecha_compra = models.DateField(blank=True, null=True)
     fecha_caducidad = models.JSONField(blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'insumos'
-
-
+ 
+ 
 class Inventario(models.Model):
     id_insumo = models.ForeignKey(Insumos, models.DO_NOTHING, db_column='id_insumo')
-    id_producto = models.ForeignKey('Productos', models.DO_NOTHING, db_column='id_producto')
+    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
     cantidad = models.JSONField()
     fecha_caducidad = models.DateField(blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'inventario'
-
-
+ 
+ 
 class Mantenimientos(models.Model):
     id_mantenimiento = models.AutoField(primary_key=True)
     id_equipo = models.ForeignKey(EquiposDeRefrigeracion, models.DO_NOTHING, db_column='id_equipo')
@@ -65,11 +89,11 @@ class Mantenimientos(models.Model):
     fecha_mantenimiento = models.DateField()
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     proximo_mantenimiento = models.JSONField(blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'mantenimientos'
-
-
+ 
+ 
 class Pedidos(models.Model):
     id_pedido = models.AutoField(primary_key=True)
     fecha_pedido = models.DateTimeField()
@@ -77,50 +101,73 @@ class Pedidos(models.Model):
     estado = models.CharField(max_length=9, blank=True, null=True)
     total = models.JSONField()
     orden = models.IntegerField(blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'pedidos'
-
-
+ 
+ 
 class ProductoInsumos(models.Model):
-    pk = models.CompositePrimaryKey('id_producto', 'id_insumo')
-    id_producto = models.ForeignKey('Productos', models.DO_NOTHING, db_column='id_producto')
+    # Django no soporta claves primarias compuestas, se simula con unique_together
+    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
     id_insumo = models.ForeignKey(Insumos, models.DO_NOTHING, db_column='id_insumo')
     cantidad = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-
+ 
     class Meta:
         db_table = 'producto_insumos'
-
-
-class Productos(models.Model):
-    id_producto = models.AutoField(primary_key=True)
-    nombre = models.CharField(max_length=100)
-    descripcion = models.CharField(max_length=255, blank=True, null=True)
-    precio = models.JSONField()
-    categoria = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = 'productos'
-
-
-class Usuarios(models.Model):
-    id_usuario = models.OneToOneField(DatosPersonales, models.DO_NOTHING, db_column='id_usuario', primary_key=True)
+        unique_together = (('id_producto', 'id_insumo'),)  # evita duplicados
+ 
+ 
+# ------------------------------------------------------------
+# Modelo de usuario personalizado (reemplaza auth_user)
+# ------------------------------------------------------------
+ 
+class UsuarioManager(BaseUserManager):
+    def create_user(self, usuario, password=None, **extra_fields):
+        if not usuario:
+            raise ValueError('El campo usuario es obligatorio')
+        user = self.model(usuario=usuario, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+ 
+    def create_superuser(self, usuario, password=None, **extra_fields):
+        extra_fields.setdefault('rol', 'admin')
+        extra_fields.setdefault('estado', 'activo')
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(usuario, password, **extra_fields)
+ 
+ 
+class Usuarios(AbstractBaseUser, PermissionsMixin):
+    # Clave primaria propia (AutoField)
+    id_usuario = models.AutoField(primary_key=True)
+ 
+    # Relación opcional con DatosPersonales (no es la PK)
+    datos_personales = models.OneToOneField(
+        DatosPersonales,
+        on_delete=models.SET_NULL,
+        db_column='id_datos_personales',   # nombre de la columna en la tabla
+        null=True,
+        blank=True
+    )
+ 
     usuario = models.CharField(unique=True, max_length=50)
-    contrasena = models.CharField(max_length=50)
+    contrasena = models.CharField(max_length=128)  # almacena el hash
     rol = models.CharField(max_length=8)
-    estado = models.CharField(max_length=8, blank=True, null=True)
-
+    estado = models.CharField(max_length=8, blank=True, null=True, default='activo')
+ 
+    # Campos requeridos por Django
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    # is_superuser y last_login se heredan de PermissionsMixin y AbstractBaseUser
+ 
+    objects = UsuarioManager()
+ 
+    USERNAME_FIELD = 'usuario'
+    REQUIRED_FIELDS = []
+ 
     class Meta:
         db_table = 'usuarios'
-
-
-class Ventas(models.Model):
-    id_venta = models.AutoField(primary_key=True)
-    id_usuario = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_usuario')
-    id_pedido = models.ForeignKey(Pedidos, models.DO_NOTHING, db_column='id_pedido', blank=True, null=True)
-    fecha_venta = models.DateTimeField()
-    total = models.JSONField()
-    ticket = models.CharField(unique=True, max_length=50)
-
-    class Meta:
-        db_table = 'ventas'
+ 
+    def __str__(self):
+        return self.usuario
