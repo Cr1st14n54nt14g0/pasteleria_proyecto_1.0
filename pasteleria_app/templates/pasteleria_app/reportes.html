@@ -1,0 +1,47 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Reportes - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4"><i class="fas fa-chart-bar"></i> Reportes</h2>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">${{ total_ventas|floatformat:2 }}</h5>
+                    <p class="card-text">Total en Ventas</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">{{ total_pedidos }}</h5>
+                    <p class="card-text">Pedidos Totales</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">{{ total_productos }}</h5>
+                    <p class="card-text">Productos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mt-4">Pedidos por Estado</h4>
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr><th>Estado</th><th>Cantidad</th></tr>
+        </thead>
+        <tbody>
+            {% for item in pedidos_estados %}
+            <tr><td>{{ item.estado|default:"Sin estado" }}</td><td>{{ item.total }}</td></tr>
+            {% empty %}
+            <tr><td colspan="2">No hay datos</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

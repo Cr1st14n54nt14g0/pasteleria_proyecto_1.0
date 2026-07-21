@@ -1,0 +1,40 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Insumos - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4"><i class="fas fa-flask"></i> Insumos</h2>
+    <div class="card">
+        <div class="card-header">Lista de Insumos</div>
+        <div class="card-body table-responsive">
+            {% if insumos %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Unidad</th>
+                        <th>Cantidad</th>
+                        <th>Fecha Compra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in insumos %}
+                    <tr>
+                        <td>{{ i.id_insumo }}</td>
+                        <td>{{ i.nombre_insumo }}</td>
+                        <td>{{ i.tipo_insumo }}</td>
+                        <td>{{ i.unidad|default:"-" }}</td>
+                        <td>{{ i.cantidad }}</td>
+                        <td>{{ i.fecha_compra|date:"d/m/Y"|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">No hay insumos registrados.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
