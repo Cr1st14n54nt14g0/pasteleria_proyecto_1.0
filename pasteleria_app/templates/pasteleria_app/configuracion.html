@@ -1,0 +1,16 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Configuración - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4"><i class="fas fa-cog"></i> Configuración</h2>
+    <div class="card">
+        <div class="card-header">Mi Perfil</div>
+        <div class="card-body">
+            <p><strong>Usuario:</strong> {{ user.usuario }}</p>
+            <p><strong>Rol:</strong> {{ user.rol }}</p>
+            <p><strong>Estado:</strong> {{ user.estado }}</p>
+            <!-- Aquí después podremos añadir cambio de contraseña -->
+        </div>
+    </div>
+</div>
+{% endblock %}
