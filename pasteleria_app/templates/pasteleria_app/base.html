@@ -24,7 +24,7 @@
     <div class="p-3">
       <h4 class="fw-bold">Pastelería</h4>
       <ul class="nav flex-column mt-3">
-<li class="nav-item mb-2 {% if active_page == 'dashboard' %}active{% endif %}">
+        <li class="nav-item mb-2 {% if active_page == 'dashboard' %}active{% endif %}">
                     <a class="nav-link" href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 </li>
                 <li class="nav-item mb-2 {% if active_page == 'pedidos' %}active{% endif %}">
@@ -65,15 +65,33 @@
     </div>
     <div class="offcanvas-body">
       <ul class="nav flex-column">
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-        <li class="nav-item mb-2 {% if active_page == 'mantenimiento' %}active{% endif %}">
-            <a class="nav-link" href="{% url 'mantenimiento_equipos' %}"><i class="fas fa-tools"></i> Mantenimiento</a>
-        </li>
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-box"></i> Pedidos</a></li>
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-birthday-cake"></i> Productos</a></li>
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-user"></i> Clientes</a></li>
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-chart-line"></i> Reportes</a></li>
-        <li class="nav-item mb-2"><a class="nav-link" href="#"><i class="fas fa-cog"></i> Configuración</a></li>
+        <li class="nav-item mb-2 {% if active_page == 'dashboard' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'pedidos' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'lista_pedidos' %}"><i class="fas fa-box"></i> Pedidos</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'productos' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'lista_productos' %}"><i class="fas fa-birthday-cake"></i> Productos</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'inventario' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'inventario' %}"><i class="fas fa-warehouse"></i> Inventario</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'insumos' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'lista_insumos' %}"><i class="fas fa-flask"></i> Insumos</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'clientes' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'lista_clientes' %}"><i class="fas fa-users"></i> Clientes</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'mantenimiento' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'mantenimiento_equipos' %}"><i class="fas fa-tools"></i> Mantenimiento</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'reportes' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'reportes' %}"><i class="fas fa-chart-bar"></i> Reportes</a>
+                </li>
+                <li class="nav-item mb-2 {% if active_page == 'configuracion' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'configuracion' %}"><i class="fas fa-cog"></i> Configuración</a>
+                </li>
       </ul>
     </div>
   </div>
