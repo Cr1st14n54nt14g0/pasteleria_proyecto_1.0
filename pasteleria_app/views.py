@@ -104,11 +104,18 @@ def lista_clientes(request):
 
 @login_required
 def reportes(request):
-    total_ventas = Ventas.objects.aggregate(total=Sum('total'))['total'] or 0
+    # Total de ventas (corregido con Cast)
+    total_ventas = Ventas.objects.annotate(
+        total_numerico=Cast('total', FloatField())
+    ).aggregate(
+        total=Sum('total_numerico')
+    )['total'] or 0
+
     total_pedidos = Pedidos.objects.count()
     pedidos_estados = Pedidos.objects.values('estado').annotate(total=Count('id_pedido'))
     total_productos = Productos.objects.count()
     total_insumos = Insumos.objects.count()
+
     contexto = {
         'active_page': 'reportes',
         'total_ventas': total_ventas,
