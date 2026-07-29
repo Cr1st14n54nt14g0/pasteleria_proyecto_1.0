@@ -1,77 +1,63 @@
 {% extends 'pasteleria_app/base.html' %}
- 
 {% block title %}Dashboard - Pastelería{% endblock %}
- 
 {% block content %}
 <div class="container-fluid">
     <h2 class="mb-4">Bienvenido, {{ user.usuario|default:"Usuario" }}</h2>
- 
-    <!-- Resumen general -->
-    <div class="card mb-4">
-        <div class="card-header">Resumen General</div>
-        <div class="card-body">
-            <div class="row text-center">
-                <div class="col-md-3 mb-3">
-                    <div class="card text-white bg-primary">
-                        <div class="card-body">
-                            <i class="fas fa-birthday-cake fa-2x mb-2"></i>
-                            <h5 class="card-title">{{ total_productos }}</h5>
-                            <p class="card-text">Productos</p>
-                        </div>
-                    </div>
+
+    <div class="row text-center">
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <i class="fas fa-birthday-cake fa-2x mb-2"></i>
+                    <h5 class="card-title">{{ total_productos }}</h5>
+                    <p class="card-text">Productos</p>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card text-white bg-success">
-                        <div class="card-body">
-                            <i class="fas fa-box fa-2x mb-2"></i>
-                            <h5 class="card-title">{{ total_pedidos }}</h5>
-                            <p class="card-text">Pedidos Totales</p>
-                        </div>
-                    </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <i class="fas fa-box fa-2x mb-2"></i>
+                    <h5 class="card-title">{{ total_pedidos }}</h5>
+                    <p class="card-text">Pedidos Totales</p>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card text-white bg-warning">
-                        <div class="card-body">
-                            <i class="fas fa-clock fa-2x mb-2"></i>
-                            <h5 class="card-title">{{ pedidos_pendientes }}</h5>
-                            <p class="card-text">Pendientes</p>
-                        </div>
-                    </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <i class="fas fa-clock fa-2x mb-2"></i>
+                    <h5 class="card-title">{{ pedidos_pendientes }}</h5>
+                    <p class="card-text">Pendientes</p>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card text-white bg-danger">
-                        <div class="card-body">
-                            <i class="fas fa-dollar-sign fa-2x mb-2"></i>
-                            <h5 class="card-title">${{ ingresos|floatformat:2 }}</h5>
-                            <p class="card-text">Ingresos</p>
-                        </div>
-                    </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                    <h5 class="card-title">${{ ingresos|floatformat:2 }}</h5>
+                    <p class="card-text">Ingresos</p>
                 </div>
             </div>
         </div>
     </div>
- 
-    <!-- Tabla de pedidos recientes -->
-    <div class="card">
+
+    <div class="card mt-4">
         <div class="card-header"><i class="fas fa-list"></i> Pedidos Recientes</div>
         <div class="card-body table-responsive">
             {% if pedidos %}
             <table class="table table-striped">
                 <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Estado</th>
-                        <th>Total</th>
-                    </tr>
+                    <tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Total</th></tr>
                 </thead>
                 <tbody>
-                    {% for pedido in pedidos %}
+                    {% for p in pedidos %}
                     <tr>
-                        <td>{{ pedido.id_pedido }}</td>
-                        <td>{{ pedido.fecha_pedido|date:"d/m/Y H:i" }}</td>
-                        <td>{{ pedido.estado|default:"-" }}</td>
-                        <td>${{ pedido.total }}</td>
+                        <td>{{ p.id_pedido }}</td>
+                        <td>{{ p.fecha_pedido|date:"d/m/Y H:i" }}</td>
+                        <td>{{ p.estado|default:"-" }}</td>
+                        <td>${{ p.total|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

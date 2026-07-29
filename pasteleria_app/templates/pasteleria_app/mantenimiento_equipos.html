@@ -1,20 +1,11 @@
 {% extends 'pasteleria_app/base.html' %}
-
 {% block title %}Mantenimiento de Equipos{% endblock %}
-
 {% block content %}
 <div class="main-container">
-    <!-- Encabezado -->
     <div class="header-row">
-        <div class="header-box logo-box">
-            LOGO
-        </div>
-        <div class="header-box title-box">
-            MANTENIMIENTO DE EQUIPOS
-        </div>
+        <div class="header-box logo-box">LOGO</div>
+        <div class="header-box title-box">MANTENIMIENTO DE EQUIPOS</div>
     </div>
-
-    <!-- Tabla de Equipos -->
     <table class="equipment-table">
         <thead>
             <tr>
@@ -41,17 +32,12 @@
             {% endfor %}
         </tbody>
     </table>
-
-    <!-- Pie de página / Botón -->
     <div class="footer-row">
-        <a href="#" class="register-btn">
-            REGISTRAR<br>MANTENIMIENTO
-        </a>
+        <a href="#" class="register-btn">REGISTRAR<br>MANTENIMIENTO</a>
     </div>
 </div>
 
 <style>
-    /* Estilos para replicar el diseño de la imagen */
     .main-container {
         border: 2px solid black;
         padding: 20px;
@@ -59,14 +45,12 @@
         margin: 40px auto;
         font-family: Arial, sans-serif;
     }
-
     .header-row {
         display: grid;
         grid-template-columns: 25% 75%;
         border-bottom: 2px solid black;
         margin-bottom: 20px;
     }
-
     .header-box {
         padding: 30px 0;
         text-align: center;
@@ -74,40 +58,29 @@
         align-items: center;
         justify-content: center;
     }
-
     .logo-box {
         border-right: 2px solid black;
         font-weight: bold;
     }
-
     .title-box {
         font-weight: bold;
         font-size: 1.1em;
     }
-
     .equipment-table {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
     }
-
     .equipment-table th, .equipment-table td {
         border: 2px solid black;
         padding: 15px;
         text-align: center;
     }
-
-    .equipment-table th {
-        font-weight: normal;
-        text-transform: uppercase;
-    }
-
     .footer-row {
         border-top: 2px solid black;
         padding-top: 25px;
         text-align: center;
     }
-
     .register-btn {
         background-color: #5a9bd5;
         color: white;
@@ -120,7 +93,6 @@
         display: inline-block;
         border: 1px solid #427db3;
     }
-
     .register-btn:hover {
         background-color: #427db3;
     }

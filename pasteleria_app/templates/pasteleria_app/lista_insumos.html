@@ -16,6 +16,7 @@
                         <th>Unidad</th>
                         <th>Cantidad</th>
                         <th>Fecha Compra</th>
+                        <th>Fecha Caducidad</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -27,6 +28,7 @@
                         <td>{{ i.unidad|default:"-" }}</td>
                         <td>{{ i.cantidad }}</td>
                         <td>{{ i.fecha_compra|date:"d/m/Y"|default:"-" }}</td>
+                        <td>{{ i.fecha_caducidad|default:"-" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
