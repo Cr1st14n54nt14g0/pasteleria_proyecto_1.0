@@ -42,6 +42,13 @@ urlpatterns = [
     path('clientes/<int:pk>/editar/', views.ClienteUpdateView.as_view(), name='cliente_update'),
     path('clientes/<int:pk>/eliminar/', views.ClienteDeleteView.as_view(), name='cliente_delete'),
 
+    path('almacen/', views.almacen, name='almacen'),
+
+    # CRUD Inventario
+    path('inventario/nuevo/', views.InventarioCreateView.as_view(), name='inventario_create'),
+    path('inventario/<int:pk>/editar/', views.InventarioUpdateView.as_view(), name='inventario_update'),
+    path('inventario/<int:pk>/eliminar/', views.InventarioDeleteView.as_view(), name='inventario_delete'),
+
 ]
 
 

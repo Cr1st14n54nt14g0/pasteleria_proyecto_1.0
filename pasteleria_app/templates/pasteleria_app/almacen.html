@@ -1,0 +1,110 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Almacén - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4"><i class="fas fa-warehouse"></i> Almacén</h2>
+
+    <ul class="nav nav-tabs" id="almacenTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="productos-tab" data-bs-toggle="tab" data-bs-target="#productos" type="button" role="tab">Productos</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="insumos-tab" data-bs-toggle="tab" data-bs-target="#insumos" type="button" role="tab">Insumos</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario" type="button" role="tab">Inventario</button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <!-- Pestaña Productos -->
+        <div class="tab-pane fade show active" id="productos" role="tabpanel">
+            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                <a href="{% url 'producto_create' %}" class="btn btn-primary mb-2"><i class="fas fa-plus"></i> Nuevo Producto</a>
+            {% endif %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>Nombre</th><th>Precio</th><th>Categoría</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in productos %}
+                    <tr>
+                        <td>{{ p.nombre }}</td>
+                        <td>${{ p.precio|floatformat:2 }}</td>
+                        <td>{{ p.categoria }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                                <a href="{% url 'producto_update' p.pk %}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'producto_delete' p.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">No hay productos.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pestaña Insumos -->
+        <div class="tab-pane fade" id="insumos" role="tabpanel">
+            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                <a href="{% url 'insumo_create' %}" class="btn btn-primary mb-2"><i class="fas fa-plus"></i> Nuevo Insumo</a>
+            {% endif %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>Nombre</th><th>Tipo</th><th>Unidad</th><th>Cantidad</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for i in insumos %}
+                    <tr>
+                        <td>{{ i.nombre_insumo }}</td>
+                        <td>{{ i.tipo_insumo }}</td>
+                        <td>{{ i.unidad }}</td>
+                        <td>{{ i.cantidad }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                                <a href="{% url 'insumo_update' i.pk %}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'insumo_delete' i.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">No hay insumos.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pestaña Inventario -->
+        <div class="tab-pane fade" id="inventario" role="tabpanel">
+            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                <a href="{% url 'inventario_create' %}" class="btn btn-primary mb-2"><i class="fas fa-plus"></i> Nuevo Registro</a>
+            {% endif %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>Producto</th><th>Insumo</th><th>Cantidad</th><th>Caducidad</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for inv in inventario_items %}
+                    <tr>
+                        <td>{{ inv.id_producto.nombre }}</td>
+                        <td>{{ inv.id_insumo.nombre_insumo }}</td>
+                        <td>{{ inv.cantidad }}</td>
+                        <td>{{ inv.fecha_caducidad|date:"d/m/Y"|default:"-" }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                                <a href="{% url 'inventario_update' inv.pk %}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'inventario_delete' inv.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">No hay registros de inventario.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

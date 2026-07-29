@@ -14,6 +14,8 @@ from django.utils.decorators import method_decorator
 from .decorators import role_required
 from .forms import ProductoForm, InsumoForm, PedidoForm, EquipoForm, MantenimientoForm, DatosPersonalesForm
 
+from .forms import InventarioForm
+
 # ------------------------------------------------------------
 # Autenticación
 # ------------------------------------------------------------
@@ -181,20 +183,20 @@ class ProductoCreateView(RoleRequiredMixin, CreateView):
     model = Productos
     form_class = ProductoForm
     template_name = 'pasteleria_app/producto_form.html'
-    success_url = reverse_lazy('lista_productos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 class ProductoUpdateView(RoleRequiredMixin, UpdateView):
     model = Productos
     form_class = ProductoForm
     template_name = 'pasteleria_app/producto_form.html'
-    success_url = reverse_lazy('lista_productos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 class ProductoDeleteView(RoleRequiredMixin, DeleteView):
     model = Productos
     template_name = 'pasteleria_app/producto_confirm_delete.html'
-    success_url = reverse_lazy('lista_productos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 # ---------- Insumos ----------
@@ -202,20 +204,20 @@ class InsumoCreateView(RoleRequiredMixin, CreateView):
     model = Insumos
     form_class = InsumoForm
     template_name = 'pasteleria_app/insumo_form.html'
-    success_url = reverse_lazy('lista_insumos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 class InsumoUpdateView(RoleRequiredMixin, UpdateView):
     model = Insumos
     form_class = InsumoForm
     template_name = 'pasteleria_app/insumo_form.html'
-    success_url = reverse_lazy('lista_insumos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 class InsumoDeleteView(RoleRequiredMixin, DeleteView):
     model = Insumos
     template_name = 'pasteleria_app/insumo_confirm_delete.html'
-    success_url = reverse_lazy('lista_insumos')
+    success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
 
 # ---------- Pedidos ----------
@@ -301,3 +303,38 @@ class ClienteDeleteView(RoleRequiredMixin, DeleteView):
     template_name = 'pasteleria_app/cliente_confirm_delete.html'
     success_url = reverse_lazy('lista_clientes')
     required_roles = ['admin']
+
+# ---------- Almacen ----------
+
+@login_required
+def almacen(request):
+    productos = Productos.objects.all()
+    insumos = Insumos.objects.all()
+    inventario_items = Inventario.objects.select_related('id_producto', 'id_insumo').all()
+    contexto = {
+        'active_page': 'almacen',
+        'productos': productos,
+        'insumos': insumos,
+        'inventario_items': inventario_items,
+    }
+    return render(request, 'pasteleria_app/almacen.html', contexto)
+
+class InventarioCreateView(RoleRequiredMixin, CreateView):
+    model = Inventario
+    form_class = InventarioForm
+    template_name = 'pasteleria_app/inventario_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'trabajador']
+
+class InventarioUpdateView(RoleRequiredMixin, UpdateView):
+    model = Inventario
+    form_class = InventarioForm
+    template_name = 'pasteleria_app/inventario_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'trabajador']
+
+class InventarioDeleteView(RoleRequiredMixin, DeleteView):
+    model = Inventario
+    template_name = 'pasteleria_app/inventario_confirm_delete.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'trabajador']

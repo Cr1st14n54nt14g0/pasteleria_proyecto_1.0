@@ -118,17 +118,8 @@
                         {% endif %}
 
                         {% if user.rol == 'admin' or user.rol == 'trabajador' %}
-                            <li class="nav-item mb-2 {% if active_page == 'productos' %}active{% endif %}">
-                                <a class="nav-link" href="{% url 'lista_productos' %}"><i class="fas fa-birthday-cake"></i> Productos</a>
-                            </li>
-                        {% endif %}
-
-                        {% if user.rol == 'admin' or user.rol == 'trabajador' %}
-                            <li class="nav-item mb-2 {% if active_page == 'inventario' %}active{% endif %}">
-                                <a class="nav-link" href="{% url 'inventario' %}"><i class="fas fa-warehouse"></i> Inventario</a>
-                            </li>
-                            <li class="nav-item mb-2 {% if active_page == 'insumos' %}active{% endif %}">
-                                <a class="nav-link" href="{% url 'lista_insumos' %}"><i class="fas fa-flask"></i> Insumos</a>
+                            <li class="nav-item mb-2 {% if active_page == 'almacen' %}active{% endif %}">
+                                <a class="nav-link" href="{% url 'almacen' %}"><i class="fas fa-warehouse"></i> Almacén</a>
                             </li>
                         {% endif %}
 
@@ -179,17 +170,8 @@
                 {% endif %}
 
                 {% if user.rol == 'admin' or user.rol == 'trabajador' %}
-                    <li class="nav-item mb-2 {% if active_page == 'productos' %}active{% endif %}">
-                        <a class="nav-link" href="{% url 'lista_productos' %}"><i class="fas fa-birthday-cake"></i> Productos</a>
-                    </li>
-                {% endif %}
-
-                {% if user.rol == 'admin' or user.rol == 'trabajador' %}
-                    <li class="nav-item mb-2 {% if active_page == 'inventario' %}active{% endif %}">
-                        <a class="nav-link" href="{% url 'inventario' %}"><i class="fas fa-warehouse"></i> Inventario</a>
-                    </li>
-                    <li class="nav-item mb-2 {% if active_page == 'insumos' %}active{% endif %}">
-                        <a class="nav-link" href="{% url 'lista_insumos' %}"><i class="fas fa-flask"></i> Insumos</a>
+                    <li class="nav-item mb-2 {% if active_page == 'almacen' %}active{% endif %}">
+                        <a class="nav-link" href="{% url 'almacen' %}"><i class="fas fa-warehouse"></i> Almacén</a>
                     </li>
                 {% endif %}
 

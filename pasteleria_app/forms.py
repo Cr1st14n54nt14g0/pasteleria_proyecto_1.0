@@ -1,5 +1,6 @@
 from django import forms
 from .models import Productos, Insumos, Pedidos, EquiposDeRefrigeracion, Mantenimientos, DatosPersonales
+from .models import Inventario
 
 class ProductoForm(forms.ModelForm):
     class Meta:
@@ -30,3 +31,11 @@ class DatosPersonalesForm(forms.ModelForm):
     class Meta:
         model = DatosPersonales
         fields = ['nombres', 'apellidos', 'telefono', 'direccion']
+
+class InventarioForm(forms.ModelForm):
+    class Meta:
+        model = Inventario
+        fields = ['id_producto', 'id_insumo', 'cantidad', 'fecha_caducidad']
+        widgets = {
+            'fecha_caducidad': forms.DateInput(attrs={'type': 'date'}),
+        }
