@@ -1,6 +1,8 @@
 from django import forms
 from .models import Productos, Insumos, Pedidos, EquiposDeRefrigeracion, Mantenimientos, DatosPersonales
 from .models import Inventario
+from django import forms
+from .models import Usuarios, DatosPersonales
 
 class ProductoForm(forms.ModelForm):
     class Meta:
@@ -39,3 +41,58 @@ class InventarioForm(forms.ModelForm):
         widgets = {
             'fecha_caducidad': forms.DateInput(attrs={'type': 'date'}),
         }
+
+class UsuarioForm(forms.ModelForm):
+    # Campos de DatosPersonales
+    nombres = forms.CharField(max_length=100, required=False)
+    apellidos = forms.CharField(max_length=100, required=False)
+    telefono = forms.JSONField(required=False)
+    direccion = forms.CharField(max_length=150, required=False)
+
+    class Meta:
+        model = Usuarios
+        fields = ['usuario', 'rol', 'estado', 'is_active', 'is_staff']
+        # is_superuser lo manejamos aparte si se requiere
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if commit:
+            user.save()
+            # Crear o actualizar DatosPersonales
+            datos, created = DatosPersonales.objects.update_or_create(
+                id_usuario=user.id_usuario,
+                defaults={
+                    'nombres': self.cleaned_data.get('nombres', ''),
+                    'apellidos': self.cleaned_data.get('apellidos', ''),
+                    'telefono': self.cleaned_data.get('telefono'),
+                    'direccion': self.cleaned_data.get('direccion', '')
+                }
+            )
+        return user
+
+class UsuarioForm(forms.ModelForm):
+    # Campos de DatosPersonales
+    nombres = forms.CharField(max_length=100, required=False)
+    apellidos = forms.CharField(max_length=100, required=False)
+    telefono = forms.CharField(required=False)  # Si es JSON, lo trataremos como texto
+    direccion = forms.CharField(max_length=150, required=False)
+
+    password = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(),
+        required=False  # No requerido al editar
+    )
+
+    class Meta:
+        model = Usuarios
+        fields = ['usuario', 'rol', 'estado', 'is_active', 'is_staff']
+        # Nota: is_superuser no se incluye; solo el admin por defecto lo tiene
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user

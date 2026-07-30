@@ -153,7 +153,7 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
  
     usuario = models.CharField(unique=True, max_length=50)
     contrasena = models.CharField(max_length=128)  # almacena el hash
-    rol = models.CharField(max_length=8)
+    rol = models.CharField(max_length=20)
     estado = models.CharField(max_length=8, blank=True, null=True, default='activo')
  
     # Campos requeridos por Django

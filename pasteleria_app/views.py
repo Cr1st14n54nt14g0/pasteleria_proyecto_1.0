@@ -1,20 +1,25 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login
+from django.contrib import messages
+from .forms import UsuarioForm
+from django.views.generic import ListView
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.conf import settings
 from django.db.models import Sum, Count, Max, FloatField
 from django.db.models.functions import Cast
 from .models import (
     DatosPersonales, Productos, Insumos, Pedidos, Ventas, DetalleVenta,
-    EquiposDeRefrigeracion, Mantenimientos, Inventario, ProductoInsumos
+    EquiposDeRefrigeracion, Mantenimientos, Inventario, ProductoInsumos,
+    Usuarios
 )
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 from .decorators import role_required
 from .forms import ProductoForm, InsumoForm, PedidoForm, EquipoForm, MantenimientoForm, DatosPersonalesForm
-
 from .forms import InventarioForm
+
 
 # ------------------------------------------------------------
 # Autenticación
@@ -338,3 +343,219 @@ class InventarioDeleteView(RoleRequiredMixin, DeleteView):
     template_name = 'pasteleria_app/inventario_confirm_delete.html'
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'trabajador']
+
+@login_required
+@role_required(['admin'])
+def lista_usuarios(request):
+    usuarios = Usuarios.objects.all().select_related('datos_personales')
+    contexto = {
+        'active_page': 'usuarios',
+        'usuarios': usuarios,
+    }
+    return render(request, 'pasteleria_app/lista_usuarios.html', contexto)
+
+@login_required
+@role_required(['admin'])
+def crear_usuario(request):
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            # Establecer campos adicionales si es necesario
+            user.save()
+            # Crear DatosPersonales
+            DatosPersonales.objects.create(
+                id_usuario=user.id_usuario,
+                nombres=form.cleaned_data['nombres'],
+                apellidos=form.cleaned_data['apellidos'],
+                telefono=form.cleaned_data['telefono'],
+                direccion=form.cleaned_data['direccion']
+            )
+            messages.success(request, 'Usuario creado exitosamente.')
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm()
+    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+@login_required
+@role_required(['admin'])
+def editar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    datos = getattr(user, 'datos_personales', None)
+    initial = {}
+    if datos:
+        initial = {
+            'nombres': datos.nombres,
+            'apellidos': datos.apellidos,
+            'telefono': datos.telefono,
+            'direccion': datos.direccion,
+        }
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST, instance=user, initial=initial)
+        if form.is_valid():
+            user = form.save()
+            # Actualizar o crear DatosPersonales
+            datos, created = DatosPersonales.objects.update_or_create(
+                id_usuario=user.id_usuario,
+                defaults={
+                    'nombres': form.cleaned_data['nombres'],
+                    'apellidos': form.cleaned_data['apellidos'],
+                    'telefono': form.cleaned_data['telefono'],
+                    'direccion': form.cleaned_data['direccion'],
+                }
+            )
+            messages.success(request, 'Usuario actualizado.')
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm(instance=user, initial=initial)
+    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+@login_required
+@role_required(['admin'])
+def eliminar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    if request.method == 'POST':
+        user.delete()
+        messages.success(request, 'Usuario eliminado.')
+        return redirect('lista_usuarios')
+    return render(request, 'pasteleria_app/usuario_confirm_delete.html', {'object': user, 'active_page': 'usuarios'})
+
+# --- Vista de fabricación de producto (descuenta insumos) ---
+@login_required
+@role_required(['admin', 'trabajador'])
+def producir_producto(request, producto_id):
+    producto = get_object_or_404(Productos, pk=producto_id)
+    insumos_necesarios = ProductoInsumos.objects.filter(id_producto=producto)
+    errores = []
+    exito = True
+    for item in insumos_necesarios:
+        insumo = item.id_insumo
+        cantidad_necesaria = item.cantidad
+        if insumo.cantidad < cantidad_necesaria:
+            errores.append(f"Stock insuficiente de {insumo.nombre_insumo}: necesita {cantidad_necesaria}, hay {insumo.cantidad}.")
+            exito = False
+    if exito:
+        for item in insumos_necesarios:
+            insumo = item.id_insumo
+            insumo.cantidad -= item.cantidad
+            insumo.save()
+        messages.success(request, f"Producto '{producto.nombre}' fabricado. Insumos descontados.")
+    else:
+        messages.error(request, "Errores: " + "; ".join(errores))
+    return redirect('lista_productos')  # o a la página de almacén, según prefieras
+
+def menu_publico(request):
+    productos = Productos.objects.all()   # Sin filtrar por 'disponible'
+    return render(request, 'pasteleria_app/menu_publico.html', {'productos': productos})
+
+@login_required
+def almacen(request):
+    productos = Productos.objects.all()
+    insumos = Insumos.objects.all()
+    inventario_items = Inventario.objects.select_related('id_producto', 'id_insumo').all()
+    contexto = {
+        'active_page': 'almacen',
+        'productos': productos,
+        'insumos': insumos,
+        'inventario_items': inventario_items,
+    }
+    return render(request, 'pasteleria_app/almacen.html', contexto)
+
+@login_required
+@role_required(['admin'])
+def lista_usuarios(request):
+    usuarios = Usuarios.objects.all().select_related('datos_personales')
+    contexto = {
+        'active_page': 'usuarios',
+        'usuarios': usuarios,
+    }
+    return render(request, 'pasteleria_app/lista_usuarios.html', contexto)
+
+@login_required
+@role_required(['admin'])
+def crear_usuario(request):
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            # Guardar usuario primero para obtener id_usuario (si es nuevo) o actualizar
+            user.save()
+            # Crear o actualizar DatosPersonales
+            datos, created = DatosPersonales.objects.update_or_create(
+                id_usuario=user.id_usuario,
+                defaults={
+                    'nombres': form.cleaned_data.get('nombres', ''),
+                    'apellidos': form.cleaned_data.get('apellidos', ''),
+                    'telefono': form.cleaned_data.get('telefono', ''),
+                    'direccion': form.cleaned_data.get('direccion', ''),
+                }
+            )
+            # Asignar la relación OneToOne (si no existe) desde Usuarios a DatosPersonales
+            if not hasattr(user, 'datos_personales') or user.datos_personales is None:
+                user.datos_personales = datos
+                user.save()
+            else:
+                # Si ya tenía uno, actualizamos los datos
+                user.datos_personales = datos
+                user.save()
+            messages.success(request, 'Usuario creado exitosamente.')
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm()
+    return render(request, 'pasteleria_app/usuario_form.html', {
+        'form': form,
+        'active_page': 'usuarios',
+        'titulo': 'Nuevo Usuario'
+    })
+
+@login_required
+@role_required(['admin'])
+def editar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    datos = getattr(user, 'datos_personales', None)
+    initial = {}
+    if datos:
+        initial = {
+            'nombres': datos.nombres,
+            'apellidos': datos.apellidos,
+            'telefono': datos.telefono,
+            'direccion': datos.direccion,
+        }
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST, instance=user, initial=initial)
+        if form.is_valid():
+            user = form.save()
+            # Actualizar DatosPersonales
+            datos, created = DatosPersonales.objects.update_or_create(
+                id_usuario=user.id_usuario,
+                defaults={
+                    'nombres': form.cleaned_data.get('nombres', ''),
+                    'apellidos': form.cleaned_data.get('apellidos', ''),
+                    'telefono': form.cleaned_data.get('telefono', ''),
+                    'direccion': form.cleaned_data.get('direccion', ''),
+                }
+            )
+            user.datos_personales = datos
+            user.save()
+            messages.success(request, 'Usuario actualizado correctamente.')
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm(instance=user, initial=initial)
+    return render(request, 'pasteleria_app/usuario_form.html', {
+        'form': form,
+        'active_page': 'usuarios',
+        'titulo': 'Editar Usuario'
+    })
+
+@login_required
+@role_required(['admin'])
+def eliminar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    if request.method == 'POST':
+        user.delete()
+        messages.success(request, 'Usuario eliminado.')
+        return redirect('lista_usuarios')
+    return render(request, 'pasteleria_app/usuario_confirm_delete.html', {
+        'object': user,
+        'active_page': 'usuarios'
+    })
