@@ -1,0 +1,24 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Registro de Actividad{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2><i class="fas fa-history"></i> Registro de Actividad</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Descripción</th></tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.fecha|date:"d/m/Y H:i" }}</td>
+                <td>{{ log.usuario.usuario|default:"Sistema" }}</td>
+                <td>{{ log.accion }}</td>
+                <td>{{ log.descripcion }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No hay registros.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

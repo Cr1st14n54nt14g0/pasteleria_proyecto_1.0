@@ -1,0 +1,13 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Producto{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Producto</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{% url 'almacen' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

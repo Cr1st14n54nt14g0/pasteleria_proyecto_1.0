@@ -30,5 +30,26 @@ urlpatterns = [
     path('inventario/<int:pk>/editar/', views.InventarioUpdateView.as_view(), name='inventario_update'),
     path('inventario/<int:pk>/eliminar/', views.InventarioDeleteView.as_view(), name='inventario_delete'),
     path('almacen/', views.almacen, name='almacen'),
-    
+    path('caja/abrir/', views.abrir_caja, name='abrir_caja'),
+    path('caja/cerrar/', views.cerrar_caja, name='cerrar_caja'),
+    path('logs/', views.ver_logs, name='ver_logs'),
+    path('calcular-insumos/', views.calcular_insumos, name='calcular_insumos'),
+    path('calcular-insumos/api/', views.calcular_insumos_api, name='calcular_insumos_api'),
+    # Vista unificada de Almacén
+    path('almacen/', views.almacen, name='almacen'),
+
+    # CRUD Productos
+    path('productos/nuevo/', views.ProductoCreateView.as_view(), name='producto_create'),
+    path('productos/<int:pk>/editar/', views.ProductoUpdateView.as_view(), name='producto_update'),
+    path('productos/<int:pk>/eliminar/', views.ProductoDeleteView.as_view(), name='producto_delete'),
+
+    # CRUD Insumos
+    path('insumos/nuevo/', views.InsumoCreateView.as_view(), name='insumo_create'),
+    path('insumos/<int:pk>/editar/', views.InsumoUpdateView.as_view(), name='insumo_update'),
+    path('insumos/<int:pk>/eliminar/', views.InsumoDeleteView.as_view(), name='insumo_delete'),
+
+    # CRUD Inventario
+    path('inventario/nuevo/', views.InventarioCreateView.as_view(), name='inventario_create'),
+    path('inventario/<int:pk>/editar/', views.InventarioUpdateView.as_view(), name='inventario_update'),
+    path('inventario/<int:pk>/eliminar/', views.InventarioDeleteView.as_view(), name='inventario_delete'),
 ]

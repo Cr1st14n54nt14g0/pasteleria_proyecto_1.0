@@ -1,3 +1,4 @@
+from .utils import registrar_log
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -19,6 +20,40 @@ from django.utils.decorators import method_decorator
 from .decorators import role_required
 from .forms import ProductoForm, InsumoForm, PedidoForm, EquipoForm, MantenimientoForm, DatosPersonalesForm
 from .forms import InventarioForm
+from .models import Caja
+from django.utils import timezone
+from .utils import registrar_log   # solo si creaste utils.py
+from .models import Log   # <-- agrega esta línea
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from django.core.exceptions import PermissionDenied
+
+@login_required
+@require_GET
+def calcular_insumos_api(request):
+    producto_id = request.GET.get('producto_id')
+    cantidad = request.GET.get('cantidad', 1)
+    try:
+        cantidad = int(cantidad)
+    except ValueError:
+        return JsonResponse({'error': 'Cantidad no válida'}, status=400)
+
+    producto = get_object_or_404(Productos, pk=producto_id)
+    insumos = ProductoInsumos.objects.filter(id_producto=producto).select_related('id_insumo')
+    data = []
+    for item in insumos:
+        insumo = item.id_insumo
+        total_necesario = item.cantidad * cantidad
+        data.append({
+            'insumo': insumo.nombre_insumo,
+            'unidad': insumo.unidad,
+            'cantidad_por_unidad': item.cantidad,
+            'total_necesario': total_necesario,
+            'stock_actual': insumo.cantidad,
+            'suficiente': insumo.cantidad >= total_necesario,
+        })
+    return JsonResponse({'producto': producto.nombre, 'insumos': data})
 
 
 # ------------------------------------------------------------
@@ -69,6 +104,7 @@ def dashboard(request):
 # Pedidos
 # ------------------------------------------------------------
 @login_required
+@role_required(['admin', 'cajero', 'cocinero'])
 def lista_pedidos(request):
     pedidos = Pedidos.objects.all().order_by('-fecha_pedido')
     contexto = {
@@ -422,27 +458,31 @@ def eliminar_usuario(request, pk):
 
 # --- Vista de fabricación de producto (descuenta insumos) ---
 @login_required
-@role_required(['admin', 'trabajador'])
+@role_required(['admin', 'cocinero'])
 def producir_producto(request, producto_id):
     producto = get_object_or_404(Productos, pk=producto_id)
     insumos_necesarios = ProductoInsumos.objects.filter(id_producto=producto)
     errores = []
     exito = True
+
     for item in insumos_necesarios:
         insumo = item.id_insumo
         cantidad_necesaria = item.cantidad
         if insumo.cantidad < cantidad_necesaria:
             errores.append(f"Stock insuficiente de {insumo.nombre_insumo}: necesita {cantidad_necesaria}, hay {insumo.cantidad}.")
             exito = False
+
     if exito:
         for item in insumos_necesarios:
             insumo = item.id_insumo
             insumo.cantidad -= item.cantidad
             insumo.save()
         messages.success(request, f"Producto '{producto.nombre}' fabricado. Insumos descontados.")
+        registrar_log(request.user, 'Fabricación', f'Producto: {producto.nombre}')
     else:
         messages.error(request, "Errores: " + "; ".join(errores))
-    return redirect('lista_productos')  # o a la página de almacén, según prefieras
+
+    return redirect('almacen')
 
 def menu_publico(request):
     productos = Productos.objects.all()   # Sin filtrar por 'disponible'
@@ -559,3 +599,163 @@ def eliminar_usuario(request, pk):
         'object': user,
         'active_page': 'usuarios'
     })
+
+@login_required
+@role_required(['admin', 'cajero'])
+def abrir_caja(request):
+    # Verificar si ya hay una caja abierta
+    if Caja.objects.filter(estado='abierta').exists():
+        messages.error(request, "Ya existe una caja abierta. Debe cerrarla antes de abrir otra.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        monto_inicial = request.POST.get('monto_inicial', 0)
+        caja = Caja.objects.create(
+            usuario_apertura=request.user,
+            monto_inicial=monto_inicial
+        )
+        messages.success(request, "Caja abierta correctamente.")
+        registrar_log(request.user, 'Apertura de caja', f'Monto inicial: {monto_inicial}')
+        return redirect('dashboard')
+
+    return render(request, 'pasteleria_app/abrir_caja.html', {'active_page': 'caja'})
+    
+
+@login_required
+@role_required(['admin', 'cajero'])
+def cerrar_caja(request):
+    caja_abierta = Caja.objects.filter(estado='abierta').first()
+    if not caja_abierta:
+        messages.error(request, "No hay ninguna caja abierta.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        monto_final = request.POST.get('monto_final')
+        caja_abierta.monto_final = monto_final
+        caja_abierta.fecha_cierre = timezone.now()
+        caja_abierta.estado = 'cerrada'
+        caja_abierta.save()
+        messages.success(request, "Caja cerrada correctamente.")
+        registrar_log(request.user, 'Cierre de caja', f'Monto final: {monto_final}')
+        return redirect('dashboard')
+
+    return render(request, 'pasteleria_app/cerrar_caja.html', {'caja': caja_abierta, 'active_page': 'caja'})
+
+@login_required
+@role_required(['admin'])
+def ver_logs(request):
+    logs = Log.objects.all()[:100]  # últimos 100 registros
+    return render(request, 'pasteleria_app/logs.html', {'logs': logs, 'active_page': 'logs'})
+
+@login_required
+@require_GET
+def calcular_insumos_api(request):
+    producto_id = request.GET.get('producto_id')
+    cantidad = request.GET.get('cantidad', 1)
+    try:
+        cantidad = int(cantidad)
+    except ValueError:
+        return JsonResponse({'error': 'Cantidad no válida'}, status=400)
+
+    producto = get_object_or_404(Productos, pk=producto_id)
+    insumos = ProductoInsumos.objects.filter(id_producto=producto).select_related('id_insumo')
+    data = []
+    for item in insumos:
+        insumo = item.id_insumo
+        total_necesario = item.cantidad * cantidad
+        data.append({
+            'insumo': insumo.nombre_insumo,
+            'unidad': insumo.unidad,
+            'cantidad_por_unidad': item.cantidad,
+            'total_necesario': total_necesario,
+            'stock_actual': insumo.cantidad,
+            'suficiente': insumo.cantidad >= total_necesario,
+        })
+    return JsonResponse({'producto': producto.nombre, 'insumos': data})
+
+@login_required
+@role_required(['admin', 'cocinero', 'cajero'])
+def calcular_insumos(request):
+    productos = Productos.objects.all()
+    return render(request, 'pasteleria_app/calcular_insumos.html', {
+        'productos': productos,
+        'active_page': 'calcular_insumos'
+    })
+
+
+class RoleRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    required_roles = []  # Se define en cada vista
+
+    def test_func(self):
+        return self.request.user.rol in self.required_roles
+
+    def handle_no_permission(self):
+        if self.request.user.is_authenticated:
+            # Si está autenticado pero no tiene el rol adecuado, error 403
+            raise PermissionDenied("No tienes permiso para acceder a esta página.")
+        else:
+            # Si no está autenticado, redirige al login
+            return super().handle_no_permission()
+
+# ---------- Productos ----------
+class ProductoCreateView(RoleRequiredMixin, CreateView):
+    model = Productos
+    form_class = ProductoForm
+    template_name = 'pasteleria_app/producto_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class ProductoUpdateView(RoleRequiredMixin, UpdateView):
+    model = Productos
+    form_class = ProductoForm
+    template_name = 'pasteleria_app/producto_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class ProductoDeleteView(RoleRequiredMixin, DeleteView):
+    model = Productos
+    template_name = 'pasteleria_app/producto_confirm_delete.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+# ---------- Insumos ----------
+class InsumoCreateView(RoleRequiredMixin, CreateView):
+    model = Insumos
+    form_class = InsumoForm
+    template_name = 'pasteleria_app/insumo_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class InsumoUpdateView(RoleRequiredMixin, UpdateView):
+    model = Insumos
+    form_class = InsumoForm
+    template_name = 'pasteleria_app/insumo_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class InsumoDeleteView(RoleRequiredMixin, DeleteView):
+    model = Insumos
+    template_name = 'pasteleria_app/insumo_confirm_delete.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+# ---------- Inventario ----------
+class InventarioCreateView(RoleRequiredMixin, CreateView):
+    model = Inventario
+    form_class = InventarioForm
+    template_name = 'pasteleria_app/inventario_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class InventarioUpdateView(RoleRequiredMixin, UpdateView):
+    model = Inventario
+    form_class = InventarioForm
+    template_name = 'pasteleria_app/inventario_form.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']
+
+class InventarioDeleteView(RoleRequiredMixin, DeleteView):
+    model = Inventario
+    template_name = 'pasteleria_app/inventario_confirm_delete.html'
+    success_url = reverse_lazy('almacen')
+    required_roles = ['admin', 'cocinero']

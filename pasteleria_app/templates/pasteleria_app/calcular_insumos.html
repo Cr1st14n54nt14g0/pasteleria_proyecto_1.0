@@ -1,0 +1,66 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Calcular Insumos{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="fas fa-calculator"></i> Calcular Insumos para Pedido</h2>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <label for="productoSelect">Seleccione un producto:</label>
+            <select id="productoSelect" class="form-select">
+                <option value="">-- Seleccione --</option>
+                {% for p in productos %}
+                    <option value="{{ p.id_producto }}">{{ p.nombre }} ({{ p.categoria }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="cantidadInput">Cantidad (unidades):</label>
+            <input type="number" id="cantidadInput" class="form-control" min="1" value="1">
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button id="calcularBtn" class="btn btn-primary">Calcular</button>
+        </div>
+    </div>
+
+    <div id="resultado" class="mt-4"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('calcularBtn').addEventListener('click', function() {
+    const productoId = document.getElementById('productoSelect').value;
+    const cantidad = document.getElementById('cantidadInput').value;
+    if (!productoId) {
+        alert('Seleccione un producto');
+        return;
+    }
+    fetch(`/calcular-insumos/api/?producto_id=${productoId}&cantidad=${cantidad}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+        let html = `<h4>Insumos necesarios para <strong>${data.producto}</strong> (x${cantidad})</h4>`;
+        html += '<table class="table table-striped"><thead><tr><th>Insumo</th><th>Unidad</th><th>Por unidad</th><th>Total necesario</th><th>Stock actual</th><th>¿Suficiente?</th></tr></thead><tbody>';
+        data.insumos.forEach(item => {
+            const clase = item.suficiente ? 'text-success' : 'text-danger';
+            html += `<tr class="${clase}">
+                <td>${item.insumo}</td>
+                <td>${item.unidad}</td>
+                <td>${item.cantidad_por_unidad}</td>
+                <td>${item.total_necesario}</td>
+                <td>${item.stock_actual}</td>
+                <td>${item.suficiente ? 'Sí' : 'No'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('resultado').innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+});
+</script>
+{% endblock %}

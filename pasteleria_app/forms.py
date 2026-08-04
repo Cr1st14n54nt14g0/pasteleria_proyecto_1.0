@@ -96,3 +96,29 @@ class UsuarioForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+from django import forms
+from .models import Productos, Insumos, Inventario
+
+class ProductoForm(forms.ModelForm):
+    class Meta:
+        model = Productos
+        fields = ['nombre', 'descripcion', 'precio', 'categoria']
+
+class InsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumos
+        fields = ['nombre_insumo', 'tipo_insumo', 'unidad', 'cantidad', 'fecha_compra', 'fecha_caducidad']
+        widgets = {
+            'fecha_compra': forms.DateInput(attrs={'type': 'date'}),
+            'fecha_caducidad': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class InventarioForm(forms.ModelForm):
+    class Meta:
+        model = Inventario
+        fields = ['id_producto', 'id_insumo', 'cantidad', 'fecha_caducidad']
+        widgets = {
+            'fecha_caducidad': forms.DateInput(attrs={'type': 'date'}),
+        }

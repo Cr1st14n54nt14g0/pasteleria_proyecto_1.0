@@ -105,13 +105,19 @@
                 <div class="d-flex flex-column align-items-start mt-4 px-3">
                     <h4 class="fw-bold mb-4">Pastelería</h4>
                     <ul class="nav flex-column">
-                        {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                        {% if user.rol == 'admin' or user.rol == 'cocinero' %}
                             <li class="nav-item mb-2 {% if active_page == 'dashboard' %}active{% endif %}">
                                 <a class="nav-link" href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                             </li>
+                        {% endif %}
+
+                        {% if user.rol == 'admin' or user.rol == 'cajero' or user.rol == 'cocinero' %}
                             <li class="nav-item mb-2 {% if active_page == 'pedidos' %}active{% endif %}">
                                 <a class="nav-link" href="{% url 'lista_pedidos' %}"><i class="fas fa-box"></i> Pedidos</a>
                             </li>
+                        {% endif %}
+
+                        {% if user.rol == 'admin' or user.rol == 'cocinero' %}
                             <li class="nav-item mb-2 {% if active_page == 'almacen' %}active{% endif %}">
                                 <a class="nav-link" href="{% url 'almacen' %}"><i class="fas fa-warehouse"></i> Almacén</a>
                             </li>
@@ -130,6 +136,33 @@
                             <li class="nav-item mb-2 {% if active_page == 'configuracion' %}active{% endif %}">
                                 <a class="nav-link" href="{% url 'configuracion' %}"><i class="fas fa-cog"></i> Configuración</a>
                             </li>
+                            {% if user.rol == 'admin' or user.rol == 'cajero' %}
+                            <li class="nav-item mb-2 {% if active_page == 'caja' %}active{% endif %}">
+                                <a class="nav-link" href="#" id="cajaMenu" data-bs-toggle="collapse" data-bs-target="#cajaSubmenu">
+                                    <i class="fas fa-cash-register"></i> Caja
+                                </a>
+                                <div class="collapse" id="cajaSubmenu">
+                                    <ul class="nav flex-column ms-3">
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="{% url 'abrir_caja' %}">Abrir Caja</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="{% url 'cerrar_caja' %}">Cerrar Caja</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                            {% endif %}
+                            {% if user.rol == 'admin' %}
+                                <li class="nav-item mb-2 {% if active_page == 'logs' %}active{% endif %}">
+                                    <a class="nav-link" href="{% url 'ver_logs' %}"><i class="fas fa-history"></i> Registro</a>
+                                </li>
+                            {% endif %}
+                            {% if user.rol == 'admin' or user.rol == 'cocinero' or user.rol == 'cajero' %}
+                                <li class="nav-item mb-2 {% if active_page == 'calcular_insumos' %}active{% endif %}">
+                                    <a class="nav-link" href="{% url 'calcular_insumos' %}"><i class="fas fa-calculator"></i> Calcular Insumos</a>
+                                </li>
+                            {% endif %}
                         {% endif %}
                     </ul>
                 </div>
@@ -151,13 +184,19 @@
         </div>
         <div class="offcanvas-body">
             <ul class="nav flex-column">
-                {% if user.rol == 'admin' or user.rol == 'trabajador' %}
+                {% if user.rol == 'admin' or user.rol == 'cocinero' %}
                     <li class="nav-item mb-2 {% if active_page == 'dashboard' %}active{% endif %}">
                         <a class="nav-link" href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                     </li>
+                {% endif %}
+
+                {% if user.rol == 'admin' or user.rol == 'cajero' or user.rol == 'cocinero' %}
                     <li class="nav-item mb-2 {% if active_page == 'pedidos' %}active{% endif %}">
                         <a class="nav-link" href="{% url 'lista_pedidos' %}"><i class="fas fa-box"></i> Pedidos</a>
                     </li>
+                {% endif %}
+
+                {% if user.rol == 'admin' or user.rol == 'cocinero' %}
                     <li class="nav-item mb-2 {% if active_page == 'almacen' %}active{% endif %}">
                         <a class="nav-link" href="{% url 'almacen' %}"><i class="fas fa-warehouse"></i> Almacén</a>
                     </li>
@@ -176,6 +215,33 @@
                     <li class="nav-item mb-2 {% if active_page == 'configuracion' %}active{% endif %}">
                         <a class="nav-link" href="{% url 'configuracion' %}"><i class="fas fa-cog"></i> Configuración</a>
                     </li>
+                    {% if user.rol == 'admin' or user.rol == 'cajero' %}
+                    <li class="nav-item mb-2 {% if active_page == 'caja' %}active{% endif %}">
+                        <a class="nav-link" href="#" id="cajaMenu" data-bs-toggle="collapse" data-bs-target="#cajaSubmenu">
+                            <i class="fas fa-cash-register"></i> Caja
+                        </a>
+                        <div class="collapse" id="cajaSubmenu">
+                            <ul class="nav flex-column ms-3">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'abrir_caja' %}">Abrir Caja</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'cerrar_caja' %}">Cerrar Caja</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                    {% endif %}
+                    {% if user.rol == 'admin' %}
+                        <li class="nav-item mb-2 {% if active_page == 'logs' %}active{% endif %}">
+                            <a class="nav-link" href="{% url 'ver_logs' %}"><i class="fas fa-history"></i> Registro</a>
+                        </li>
+                    {% endif %}
+                    {% if user.rol == 'admin' or user.rol == 'cocinero' or user.rol == 'cajero' %}
+                        <li class="nav-item mb-2 {% if active_page == 'calcular_insumos' %}active{% endif %}">
+                            <a class="nav-link" href="{% url 'calcular_insumos' %}"><i class="fas fa-calculator"></i> Calcular Insumos</a>
+                        </li>
+                    {% endif %}
                 {% endif %}
             </ul>
         </div>

@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.conf import settings
+
  
 # ------------------------------------------------------------
 # Modelos de negocio
@@ -153,7 +155,13 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
  
     usuario = models.CharField(unique=True, max_length=50)
     contrasena = models.CharField(max_length=128)  # almacena el hash
-    rol = models.CharField(max_length=20)
+    ROLES = [
+        ('admin', 'Administrador'),
+        ('cajero', 'Cajero'),
+        ('cocinero', 'Cocinero/Pastelero'),
+        ('ayudante', 'Ayudante'),
+    ]
+    rol = models.CharField(max_length=20, choices=ROLES, default='ayudante')
     estado = models.CharField(max_length=8, blank=True, null=True, default='activo')
  
     # Campos requeridos por Django
@@ -171,3 +179,42 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
  
     def __str__(self):
         return self.usuario
+
+
+class Caja(models.Model):
+    ESTADOS = [
+        ('abierta', 'Abierta'),
+        ('cerrada', 'Cerrada'),
+    ]
+    usuario_apertura = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='cajas_abiertas'
+    )
+    fecha_apertura = models.DateTimeField(auto_now_add=True)
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+    monto_inicial = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    monto_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    estado = models.CharField(max_length=10, choices=ESTADOS, default='abierta')
+    # Relación con ventas (opcional, para calcular el monto final automáticamente)
+    # Las ventas se relacionarán mediante una ForeignKey en el modelo Ventas (si no existe, la creamos después)
+
+    class Meta:
+        db_table = 'caja'
+
+    def __str__(self):
+        return f"Caja {self.id} - {self.estado}"
+
+
+class Log(models.Model):
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    accion = models.CharField(max_length=50)
+    descripcion = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'logs'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f"{self.fecha} - {self.usuario} - {self.accion}"

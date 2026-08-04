@@ -1,0 +1,12 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Eliminar Producto{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>¿Estás seguro de eliminar "{{ object.nombre }}"?</h2>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+        <a href="{% url 'almacen' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}
