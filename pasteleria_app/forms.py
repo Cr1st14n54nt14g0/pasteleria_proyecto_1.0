@@ -78,31 +78,36 @@ class UsuarioForm(forms.ModelForm):
             self.fields['rol'].choices = [('admin', 'Administrador')] + roles_permitidos
 
 class UsuarioForm(forms.ModelForm):
-    # Campos de DatosPersonales
-    nombres = forms.CharField(max_length=100, required=False)
-    apellidos = forms.CharField(max_length=100, required=False)
-    telefono = forms.CharField(required=False)  # Si es JSON, lo trataremos como texto
-    direccion = forms.CharField(max_length=150, required=False)
-
     password = forms.CharField(
         label="Contraseña",
-        widget=forms.PasswordInput(),
-        required=False  # No requerido al editar
+        required=False,
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Dejar en blanco para no cambiarla'}),
+        help_text="Solo si desea cambiarla."
     )
+    nombres = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    apellidos = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    telefono = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    direccion = forms.CharField(max_length=150, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
 
     class Meta:
         model = Usuarios
-        fields = ['usuario', 'rol', 'estado', 'is_active', 'is_staff']
-        # Nota: is_superuser no se incluye; solo el admin por defecto lo tiene
+        fields = ['usuario', 'rol']
+        widgets = {
+            'usuario': forms.TextInput(attrs={'class': 'form-control'}),
+            'rol': forms.Select(attrs={'class': 'form-select'}),
+        }
 
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        password = self.cleaned_data.get('password')
-        if password:
-            user.set_password(password)
-        if commit:
-            user.save()
-        return user
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        roles_permitidos = [
+            ('cajero', 'Cajero'),
+            ('cocinero', 'Cocinero/Pastelero'),
+            ('ayudante', 'Ayudante'),
+        ]
+        self.fields['rol'].choices = roles_permitidos
+        if self.instance.pk and self.instance.rol == 'admin':
+            self.fields['rol'].disabled = True
+            self.fields['rol'].choices = [('admin', 'Administrador')] + roles_permitidos
 
 
 from django import forms

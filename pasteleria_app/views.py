@@ -400,6 +400,7 @@ def crear_usuario(request):
         form = UsuarioForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
+            # Bloqueo extra por si intentan forzar admin por POST
             if user.rol == 'admin':
                 messages.error(request, "No se puede crear un usuario con rol de administrador.")
                 return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
@@ -410,7 +411,7 @@ def crear_usuario(request):
                 return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
 
             user.set_password(password)
-            user.is_active = True
+            user.is_active = True   # Siempre activo por defecto
             user.is_staff = False
             user.save()
 
@@ -463,6 +464,22 @@ def editar_usuario(request, pk):
     else:
         form = UsuarioForm(instance=user, initial=initial)
     return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+@login_required
+@role_required(['admin'])
+def toggle_usuario_activo(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    # No permitir desactivar al último administrador
+    if user.rol == 'admin':
+        messages.error(request, "No se puede desactivar al administrador.")
+        return redirect('lista_usuarios')
+
+    user.is_active = not user.is_active
+    user.save()
+    estado = "activado" if user.is_active else "desactivado"
+    messages.success(request, f"Usuario {user.usuario} {estado} correctamente.")
+    registrar_log(request.user, f'Cambio estado usuario', f'{user.usuario} -> {estado}')
+    return redirect('lista_usuarios')
 
 @login_required
 @role_required(['admin'])

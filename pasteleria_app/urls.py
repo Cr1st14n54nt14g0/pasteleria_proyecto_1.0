@@ -77,4 +77,5 @@ urlpatterns = [
     path('mostrador/nuevo/', views.agregar_mostrador, name='agregar_mostrador'),
     path('mostrador/<int:pk>/eliminar/', views.eliminar_mostrador, name='eliminar_mostrador'),
 
+    path('usuarios/<int:pk>/toggle-activo/', views.toggle_usuario_activo, name='toggle_usuario_activo'),
 ]

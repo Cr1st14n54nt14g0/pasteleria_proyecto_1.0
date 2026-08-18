@@ -41,12 +41,10 @@
                             </span>
                         </td>
                         <td>
-                            {% if u.estado == 'activo' %}
+                            {% if u.is_active %}
                                 <span class="badge bg-success">Activo</span>
-                            {% elif u.estado == 'inactivo' %}
-                                <span class="badge bg-danger">Inactivo</span>
                             {% else %}
-                                <span class="badge bg-secondary">{{ u.estado|default:"-" }}</span>
+                                <span class="badge bg-danger">Inactivo</span>
                             {% endif %}
                         </td>
                         <td>
@@ -65,10 +63,17 @@
                         </td>
                         <td>
                             {% if user.rol == 'admin' %}
+                                <a href="{% url 'toggle_usuario_activo' u.pk %}" class="btn btn-sm btn-outline-secondary" title="{% if u.is_active %}Desactivar{% else %}Activar{% endif %}">
+                                    {% if u.is_active %}
+                                        <i class="fas fa-user-slash"></i>
+                                    {% else %}
+                                        <i class="fas fa-user-check"></i>
+                                    {% endif %}
+                                </a>
                                 <a href="{% url 'editar_usuario' u.pk %}" class="btn btn-sm btn-outline-warning" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                {% if u.rol != 'admin' %}  {# No permitir eliminar al admin #}
+                                {% if u.rol != 'admin' %}
                                     <a href="{% url 'eliminar_usuario' u.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar">
                                         <i class="fas fa-trash"></i>
                                     </a>
