@@ -29,6 +29,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.core.exceptions import PermissionDenied
 
+from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
+from .forms import LoteInsumoForm, FabricacionForm, MostradorForm
+
 @login_required
 @require_GET
 def calcular_insumos_api(request):
@@ -397,9 +400,20 @@ def crear_usuario(request):
         form = UsuarioForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            # Establecer campos adicionales si es necesario
+            if user.rol == 'admin':
+                messages.error(request, "No se puede crear un usuario con rol de administrador.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            password = form.cleaned_data.get('password')
+            if not password:
+                messages.error(request, "Debe ingresar una contraseña para el nuevo usuario.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            user.set_password(password)
+            user.is_active = True
+            user.is_staff = False
             user.save()
-            # Crear DatosPersonales
+
             DatosPersonales.objects.create(
                 id_usuario=user.id_usuario,
                 nombres=form.cleaned_data['nombres'],
@@ -407,7 +421,7 @@ def crear_usuario(request):
                 telefono=form.cleaned_data['telefono'],
                 direccion=form.cleaned_data['direccion']
             )
-            messages.success(request, 'Usuario creado exitosamente.')
+            messages.success(request, "Usuario creado correctamente.")
             return redirect('lista_usuarios')
     else:
         form = UsuarioForm()
@@ -429,9 +443,13 @@ def editar_usuario(request, pk):
     if request.method == 'POST':
         form = UsuarioForm(request.POST, instance=user, initial=initial)
         if form.is_valid():
-            user = form.save()
-            # Actualizar o crear DatosPersonales
-            datos, created = DatosPersonales.objects.update_or_create(
+            user = form.save(commit=False)
+            password = form.cleaned_data.get('password')
+            if password:
+                user.set_password(password)
+            user.save()
+
+            DatosPersonales.objects.update_or_create(
                 id_usuario=user.id_usuario,
                 defaults={
                     'nombres': form.cleaned_data['nombres'],
@@ -440,7 +458,7 @@ def editar_usuario(request, pk):
                     'direccion': form.cleaned_data['direccion'],
                 }
             )
-            messages.success(request, 'Usuario actualizado.')
+            messages.success(request, "Usuario actualizado.")
             return redirect('lista_usuarios')
     else:
         form = UsuarioForm(instance=user, initial=initial)
@@ -759,3 +777,114 @@ class InventarioDeleteView(RoleRequiredMixin, DeleteView):
     template_name = 'pasteleria_app/inventario_confirm_delete.html'
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'cocinero']
+
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def lista_lotes(request):
+    lotes = LoteInsumo.objects.select_related('id_insumo').order_by('fecha_caducidad')
+    contexto = {
+        'active_page': 'lotes',
+        'lotes': lotes,
+    }
+    return render(request, 'pasteleria_app/lista_lotes.html', contexto)
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def crear_lote(request):
+    if request.method == 'POST':
+        form = LoteInsumoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Lote creado correctamente.")
+            registrar_log(request.user, 'Creación de lote', f"Lote de {form.instance.id_insumo.nombre_insumo}")
+            return redirect('lista_lotes')
+    else:
+        form = LoteInsumoForm()
+    return render(request, 'pasteleria_app/lote_form.html', {'form': form, 'active_page': 'lotes'})
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def eliminar_lote(request, pk):
+    lote = get_object_or_404(LoteInsumo, pk=pk)
+    if request.method == 'POST':
+        insumo = lote.id_insumo.nombre_insumo
+        lote.delete()
+        messages.success(request, "Lote eliminado.")
+        registrar_log(request.user, 'Eliminación de lote', f"Lote de {insumo}")
+        return redirect('lista_lotes')
+    return render(request, 'pasteleria_app/lote_confirm_delete.html', {'object': lote, 'active_page': 'lotes'})
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def lista_fabricacion(request):
+    fabricaciones = ProductoAlmacen.objects.select_related('id_producto').order_by('-fecha_ingreso')
+    contexto = {
+        'active_page': 'fabricacion',
+        'fabricaciones': fabricaciones,
+    }
+    return render(request, 'pasteleria_app/lista_fabricacion.html', contexto)
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def fabricar_producto(request):
+    if request.method == 'POST':
+        form = FabricacionForm(request.POST)
+        if form.is_valid():
+            fabricacion = form.save()
+            messages.success(request, f"Producto '{fabricacion.id_producto.nombre}' fabricado. Insumos descontados.")
+            registrar_log(request.user, 'Fabricación', f"Producto {fabricacion.id_producto.nombre} x{fabricacion.cantidad}")
+            return redirect('lista_fabricacion')
+    else:
+        form = FabricacionForm()
+    return render(request, 'pasteleria_app/fabricacion_form.html', {'form': form, 'active_page': 'fabricacion'})
+
+@login_required
+@role_required(['admin', 'cocinero'])
+def eliminar_fabricacion(request, pk):
+    fabricacion = get_object_or_404(ProductoAlmacen, pk=pk)
+    if request.method == 'POST':
+        producto = fabricacion.id_producto.nombre
+        fabricacion.delete()
+        messages.success(request, "Registro de fabricación eliminado.")
+        registrar_log(request.user, 'Eliminación fabricación', f"{producto} eliminado del almacén")
+        return redirect('lista_fabricacion')
+    return render(request, 'pasteleria_app/fabricacion_confirm_delete.html', {'object': fabricacion, 'active_page': 'fabricacion'})
+
+
+@login_required
+@role_required(['admin', 'cocinero', 'cajero'])
+def lista_mostrador(request):
+    mostrador = ProductoMostrador.objects.select_related('id_producto').order_by('-fecha')
+    contexto = {
+        'active_page': 'mostrador',
+        'mostrador': mostrador,
+    }
+    return render(request, 'pasteleria_app/lista_mostrador.html', contexto)
+
+@login_required
+@role_required(['admin', 'cocinero', 'cajero'])
+def agregar_mostrador(request):
+    if request.method == 'POST':
+        form = MostradorForm(request.POST)
+        if form.is_valid():
+            item = form.save()
+            messages.success(request, f"Producto '{item.id_producto.nombre}' agregado al mostrador.")
+            registrar_log(request.user, 'Mostrador', f"{item.id_producto.nombre} x{item.cantidad} en mostrador")
+            return redirect('lista_mostrador')
+    else:
+        form = MostradorForm()
+    return render(request, 'pasteleria_app/mostrador_form.html', {'form': form, 'active_page': 'mostrador'})
+
+@login_required
+@role_required(['admin', 'cocinero', 'cajero'])
+def eliminar_mostrador(request, pk):
+    item = get_object_or_404(ProductoMostrador, pk=pk)
+    if request.method == 'POST':
+        producto = item.id_producto.nombre
+        item.delete()
+        messages.success(request, "Producto retirado del mostrador.")
+        registrar_log(request.user, 'Retiro mostrador', producto)
+        return redirect('lista_mostrador')
+    return render(request, 'pasteleria_app/mostrador_confirm_delete.html', {'object': item, 'active_page': 'mostrador'})
+

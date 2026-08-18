@@ -1,0 +1,14 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Fabricar Producto{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Fabricar Producto</h2>
+    <p class="text-muted">Al guardar, se descontarán automáticamente los insumos según la receta.</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Guardar y Descontar</button>
+        <a href="{% url 'lista_fabricacion' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

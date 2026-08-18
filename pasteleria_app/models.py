@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.conf import settings
+from django.utils import timezone
 
  
 # ------------------------------------------------------------
@@ -22,8 +23,15 @@ class Productos(models.Model):
     id_producto = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=255, blank=True, null=True)
-    precio = models.JSONField()
+    precio = models.DecimalField(max_digits=10, decimal_places=2)
     categoria = models.CharField(max_length=50)
+    localizacion = models.CharField(max_length=20, choices=[
+        ('mostrador', 'Mostrador'),
+        ('pedido', 'Bajo pedido'),
+    ], default='mostrador')
+
+    def __str__(self):
+        return self.nombre
  
     class Meta:
         db_table = 'productos'
@@ -34,7 +42,7 @@ class Ventas(models.Model):
     id_usuario = models.ForeignKey('Usuarios', models.DO_NOTHING, db_column='id_usuario')
     id_pedido = models.ForeignKey('Pedidos', models.DO_NOTHING, db_column='id_pedido', blank=True, null=True)
     fecha_venta = models.DateTimeField()
-    total = models.JSONField()
+    total = models.DecimalField(max_digits=10, decimal_places=2)
     ticket = models.CharField(unique=True, max_length=50)
  
     class Meta:
@@ -44,7 +52,7 @@ class Ventas(models.Model):
 class DetalleVenta(models.Model):
     id_venta = models.ForeignKey(Ventas, models.DO_NOTHING, db_column='id_venta')
     id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
-    cantidad = models.JSONField()
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     ticket = models.CharField(max_length=50, blank=True, null=True)
  
     class Meta:
@@ -66,9 +74,12 @@ class Insumos(models.Model):
     nombre_insumo = models.CharField(max_length=100)
     tipo_insumo = models.CharField(max_length=100)
     unidad = models.CharField(max_length=2, blank=True, null=True)
-    cantidad = models.JSONField()
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     fecha_compra = models.DateField(blank=True, null=True)
-    fecha_caducidad = models.JSONField(blank=True, null=True)
+    fecha_caducidad = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return self.nombre_insumo
  
     class Meta:
         db_table = 'insumos'
@@ -77,7 +88,7 @@ class Insumos(models.Model):
 class Inventario(models.Model):
     id_insumo = models.ForeignKey(Insumos, models.DO_NOTHING, db_column='id_insumo')
     id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
-    cantidad = models.JSONField()
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_caducidad = models.DateField(blank=True, null=True)
  
     class Meta:
@@ -90,7 +101,7 @@ class Mantenimientos(models.Model):
     id_encargado = models.ForeignKey('Usuarios', models.DO_NOTHING, db_column='id_encargado')
     fecha_mantenimiento = models.DateField()
     descripcion = models.CharField(max_length=255, blank=True, null=True)
-    proximo_mantenimiento = models.JSONField(blank=True, null=True)
+    proximo_mantenimiento = models.DateField(blank=True, null=True)
  
     class Meta:
         db_table = 'mantenimientos'
@@ -101,11 +112,22 @@ class Pedidos(models.Model):
     fecha_pedido = models.DateTimeField()
     fecha_entrega = models.JSONField(blank=True, null=True)
     estado = models.CharField(max_length=9, blank=True, null=True)
-    total = models.JSONField()
+    total = models.DecimalField(max_digits=10, decimal_places=2)
     orden = models.IntegerField(blank=True, null=True)
  
     class Meta:
         db_table = 'pedidos'
+
+class DetallePedido(models.Model):
+    id_detalle_pedido = models.AutoField(primary_key=True)
+    id_pedido = models.ForeignKey(Pedidos, on_delete=models.CASCADE, db_column='id_pedido')
+    id_producto = models.ForeignKey(Productos, on_delete=models.RESTRICT, db_column='id_producto')
+    cantidad = models.PositiveIntegerField()
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = 'detalle_pedido'
  
  
 class ProductoInsumos(models.Model):
@@ -182,29 +204,34 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
 
 
 class Caja(models.Model):
-    ESTADOS = [
-        ('abierta', 'Abierta'),
-        ('cerrada', 'Cerrada'),
-    ]
-    usuario_apertura = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name='cajas_abiertas'
-    )
+    id_caja = models.AutoField(primary_key=True)
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, db_column='id_usuario')
     fecha_apertura = models.DateTimeField(auto_now_add=True)
     fecha_cierre = models.DateTimeField(null=True, blank=True)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     monto_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    estado = models.CharField(max_length=10, choices=ESTADOS, default='abierta')
-    # Relación con ventas (opcional, para calcular el monto final automáticamente)
-    # Las ventas se relacionarán mediante una ForeignKey en el modelo Ventas (si no existe, la creamos después)
+    estado = models.CharField(max_length=10, choices=[('abierta','Abierta'),('cerrada','Cerrada')], default='abierta')
 
     class Meta:
         db_table = 'caja'
 
-    def __str__(self):
-        return f"Caja {self.id} - {self.estado}"
+class MovimientoCaja(models.Model):
+    id_movimiento_caja = models.AutoField(primary_key=True)
+    id_caja = models.ForeignKey(Caja, on_delete=models.CASCADE, db_column='id_caja', related_name='movimientos')
+    id_pedido = models.ForeignKey(Pedidos, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_pedido')
+    tipo = models.CharField(max_length=15, choices=[
+        ('adelanto', 'Adelanto'),
+        ('pago_final', 'Pago final'),
+        ('otro_ingreso', 'Otro ingreso'),
+        ('egreso', 'Egreso'),
+    ])
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    descripcion = models.CharField(max_length=255, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, db_column='id_usuario')
 
+    class Meta:
+        db_table = 'movimientos_caja'
 
 class Log(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
@@ -218,3 +245,39 @@ class Log(models.Model):
 
     def __str__(self):
         return f"{self.fecha} - {self.usuario} - {self.accion}"
+
+
+class LoteInsumo(models.Model):
+    id_lote = models.AutoField(primary_key=True)
+    id_insumo = models.ForeignKey(Insumos, on_delete=models.CASCADE, db_column='id_insumo')
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_caducidad = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lotes_insumos'
+        ordering = ['fecha_caducidad', 'id_lote']
+
+    def __str__(self):
+        return f"Lote {self.id_lote} de {self.id_insumo.nombre_insumo}"
+
+class ProductoAlmacen(models.Model):
+    id_producto_almacen = models.AutoField(primary_key=True)
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
+    id_pedido = models.ForeignKey('Pedidos', on_delete=models.SET_NULL, null=True, blank=True, db_column='id_pedido')
+    cantidad = models.PositiveIntegerField(default=0)
+    fecha_ingreso = models.DateTimeField(auto_now_add=True)
+    ubicacion = models.CharField(max_length=20, default='almacen')
+
+    class Meta:
+        db_table = 'producto_almacen'
+
+class ProductoMostrador(models.Model):
+    id_producto_mostrador = models.AutoField(primary_key=True)
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
+    id_pedido = models.ForeignKey('Pedidos', on_delete=models.SET_NULL, null=True, blank=True, db_column='id_pedido')
+    cantidad = models.PositiveIntegerField(default=1)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'producto_mostrador'
+

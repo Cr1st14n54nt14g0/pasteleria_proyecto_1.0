@@ -163,6 +163,20 @@
                                     <a class="nav-link" href="{% url 'calcular_insumos' %}"><i class="fas fa-calculator"></i> Calcular Insumos</a>
                                 </li>
                             {% endif %}
+
+                            {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+                                <li class="nav-item mb-2 dropdown">
+                                    <a class="nav-link dropdown-toggle {% if active_page in 'lotes,fabricacion,mostrador' %}active{% endif %}" href="#" id="almacenesDropdown" role="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-warehouse"></i> Almacenes
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{% url 'lista_lotes' %}">Lotes de Insumos</a></li>
+                                        <li><a class="dropdown-item" href="{% url 'lista_fabricacion' %}">Fabricación</a></li>
+                                        <li><a class="dropdown-item" href="{% url 'lista_mostrador' %}">Mostrador</a></li>
+                                    </ul>
+                                </li>
+                            {% endif %}
+
                         {% endif %}
                     </ul>
                 </div>
@@ -242,6 +256,20 @@
                             <a class="nav-link" href="{% url 'calcular_insumos' %}"><i class="fas fa-calculator"></i> Calcular Insumos</a>
                         </li>
                     {% endif %}
+
+                    {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+                        <li class="nav-item mb-2 dropdown">
+                            <a class="nav-link dropdown-toggle {% if active_page in 'lotes,fabricacion,mostrador' %}active{% endif %}" href="#" id="almacenesDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-warehouse"></i> Almacenes
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'lista_lotes' %}">Lotes de Insumos</a></li>
+                                <li><a class="dropdown-item" href="{% url 'lista_fabricacion' %}">Fabricación</a></li>
+                                <li><a class="dropdown-item" href="{% url 'lista_mostrador' %}">Mostrador</a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
                 {% endif %}
             </ul>
         </div>

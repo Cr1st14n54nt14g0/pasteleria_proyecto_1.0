@@ -52,4 +52,29 @@ urlpatterns = [
     path('inventario/nuevo/', views.InventarioCreateView.as_view(), name='inventario_create'),
     path('inventario/<int:pk>/editar/', views.InventarioUpdateView.as_view(), name='inventario_update'),
     path('inventario/<int:pk>/eliminar/', views.InventarioDeleteView.as_view(), name='inventario_delete'),
+    # Lotes
+    path('lotes/', views.lista_lotes, name='lista_lotes'),
+    path('lotes/nuevo/', views.crear_lote, name='crear_lote'),
+    path('lotes/<int:pk>/eliminar/', views.eliminar_lote, name='eliminar_lote'),
+
+    # Fabricación (ProductoAlmacen)
+    path('fabricacion/', views.lista_fabricacion, name='lista_fabricacion'),
+    path('fabricacion/nueva/', views.fabricar_producto, name='fabricar_producto'),
+    path('fabricacion/<int:pk>/eliminar/', views.eliminar_fabricacion, name='eliminar_fabricacion'),
+
+    # Mostrador
+    path('mostrador/', views.lista_mostrador, name='lista_mostrador'),
+    path('mostrador/nuevo/', views.agregar_mostrador, name='agregar_mostrador'),
+    path('mostrador/<int:pk>/eliminar/', views.eliminar_mostrador, name='eliminar_mostrador'),
+
+    # Fabricación (ProductoAlmacen)
+    path('fabricacion/', views.lista_fabricacion, name='lista_fabricacion'),
+    path('fabricacion/nueva/', views.fabricar_producto, name='fabricar_producto'),
+    path('fabricacion/<int:pk>/eliminar/', views.eliminar_fabricacion, name='eliminar_fabricacion'),
+
+    # Mostrador
+    path('mostrador/', views.lista_mostrador, name='lista_mostrador'),
+    path('mostrador/nuevo/', views.agregar_mostrador, name='agregar_mostrador'),
+    path('mostrador/<int:pk>/eliminar/', views.eliminar_mostrador, name='eliminar_mostrador'),
+
 ]

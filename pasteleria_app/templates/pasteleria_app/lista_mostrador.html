@@ -1,0 +1,41 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Mostrador - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2><i class="fas fa-store"></i> Mostrador</h2>
+    {% if user.rol == 'admin' or user.rol == 'cocinero' or user.rol == 'cajero' %}
+        <a href="{% url 'agregar_mostrador' %}" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Agregar al Mostrador</a>
+    {% endif %}
+    <div class="card">
+        <div class="card-header">Productos en exhibición</div>
+        <div class="card-body table-responsive">
+            {% if mostrador %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>ID</th><th>Producto</th><th>Cantidad</th><th>Fecha</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for m in mostrador %}
+                    <tr>
+                        <td>{{ m.id_producto_mostrador }}</td>
+                        <td>{{ m.id_producto.nombre }}</td>
+                        <td>{{ m.cantidad }}</td>
+                        <td>{{ m.fecha|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'cocinero' or user.rol == 'cajero' %}
+                                <a href="{% url 'eliminar_mostrador' m.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">El mostrador está vacío.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">El mostrador está vacío.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Fabricación - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2><i class="fas fa-industry"></i> Fabricación de Productos</h2>
+    {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+        <a href="{% url 'fabricar_producto' %}" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Fabricar Producto</a>
+    {% endif %}
+    <div class="card">
+        <div class="card-header">Productos fabricados (almacén de terminados)</div>
+        <div class="card-body table-responsive">
+            {% if fabricaciones %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>ID</th><th>Producto</th><th>Cantidad</th><th>Fecha</th><th>Ubicación</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in fabricaciones %}
+                    <tr>
+                        <td>{{ f.id_producto_almacen }}</td>
+                        <td>{{ f.id_producto.nombre }}</td>
+                        <td>{{ f.cantidad }}</td>
+                        <td>{{ f.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                        <td>{{ f.ubicacion }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+                                <a href="{% url 'eliminar_fabricacion' f.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">No hay productos fabricados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">No hay productos fabricados.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Lotes de Insumos{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2><i class="fas fa-boxes"></i> Lotes de Insumos</h2>
+    {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+        <a href="{% url 'crear_lote' %}" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Nuevo Lote</a>
+    {% endif %}
+    <div class="card">
+        <div class="card-header">Lista de lotes</div>
+        <div class="card-body table-responsive">
+            {% if lotes %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>ID</th><th>Insumo</th><th>Cantidad</th><th>Fecha Caducidad</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for lote in lotes %}
+                    <tr>
+                        <td>{{ lote.id_lote }}</td>
+                        <td>{{ lote.id_insumo.nombre_insumo }}</td>
+                        <td>{{ lote.cantidad }}</td>
+                        <td>{{ lote.fecha_caducidad|date:"d/m/Y"|default:"Sin fecha" }}</td>
+                        <td>
+                            {% if user.rol == 'admin' or user.rol == 'cocinero' %}
+                                <a href="{% url 'eliminar_lote' lote.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">No hay lotes registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">No hay lotes.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
