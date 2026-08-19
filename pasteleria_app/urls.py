@@ -79,5 +79,15 @@ urlpatterns = [
 
     path('usuarios/<int:pk>/toggle-activo/', views.toggle_usuario_activo, name='toggle_usuario_activo'),
     path('cajas/gestion/', views.gestionar_cajas, name='gestionar_cajas'),
-    
+    # Equipos
+    path('equipos/', views.EquipoListView.as_view(), name='lista_equipos'),
+    path('equipos/nuevo/', views.EquipoCreateView.as_view(), name='crear_equipo'),
+    path('equipos/<int:pk>/editar/', views.EquipoUpdateView.as_view(), name='editar_equipo'),
+    path('equipos/<int:pk>/eliminar/', views.EquipoDeleteView.as_view(), name='eliminar_equipo'),
+
+    # Mantenimientos
+    path('mantenimientos/', views.MantenimientoListView.as_view(), name='lista_mantenimientos'),
+    path('mantenimientos/nuevo/', views.MantenimientoCreateView.as_view(), name='crear_mantenimiento'),
+    path('mantenimientos/<int:pk>/editar/', views.MantenimientoUpdateView.as_view(), name='editar_mantenimiento'),
+    path('mantenimientos/<int:pk>/eliminar/', views.MantenimientoDeleteView.as_view(), name='eliminar_mantenimiento'),
 ]

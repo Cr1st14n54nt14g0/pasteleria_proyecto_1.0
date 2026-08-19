@@ -4,55 +4,64 @@
 <div class="container-fluid">
     <h2 class="mb-4">Bienvenido, {{ user.usuario|default:"Usuario" }}</h2>
 
-    <div class="row text-center">
-        <div class="col-md-3 mb-3">
-            <div class="card text-white bg-primary">
-                <div class="card-body">
-                    <i class="fas fa-birthday-cake fa-2x mb-2"></i>
-                    <h5 class="card-title">{{ total_productos }}</h5>
+    <!-- ========== TARJETAS BÁSICAS (para todos los roles) ========== -->
+<!-- ========== TARJETAS BÁSICAS (para todos los roles) ========== -->
+    <div class="row g-4">
+        <div class="col-lg-4 col-md-6">
+            <div class="card text-white bg-primary shadow-sm h-100">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                    <i class="fas fa-birthday-cake fa-3x mb-3"></i>
+                    <h5 class="card-title fs-4">{{ total_productos }}</h5>
                     <p class="card-text">Productos</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card text-white bg-success">
-                <div class="card-body">
-                    <i class="fas fa-box fa-2x mb-2"></i>
-                    <h5 class="card-title">{{ total_pedidos }}</h5>
+
+        <div class="col-lg-4 col-md-6">
+            <div class="card text-white bg-success shadow-sm h-100">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                    <i class="fas fa-box fa-3x mb-3"></i>
+                    <h5 class="card-title fs-4">{{ total_pedidos }}</h5>
                     <p class="card-text">Pedidos Totales</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body">
-                    <i class="fas fa-clock fa-2x mb-2"></i>
-                    <h5 class="card-title">{{ pedidos_pendientes }}</h5>
+
+        <div class="col-lg-4 col-md-6">
+            <div class="card text-white bg-warning shadow-sm h-100">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                    <i class="fas fa-clock fa-3x mb-3"></i>
+                    <h5 class="card-title fs-4">{{ pedidos_pendientes }}</h5>
                     <p class="card-text">Pendientes</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card text-white bg-danger">
-                <div class="card-body">
-                    <i class="fas fa-dollar-sign fa-2x mb-2"></i>
-                    <h5 class="card-title">${{ ingresos|floatformat:2 }}</h5>
+
+        {% comment %} Opcional: agrega una cuarta tarjeta para Ingresos si la variable existe {% endcomment %}
+        {% if ingresos is defined %}
+        <div class="col-lg-3 col-md-6">
+            <div class="card text-white bg-danger shadow-sm h-100">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                    <i class="fas fa-dollar-sign fa-3x mb-3"></i>
+                    <h5 class="card-title fs-4">${{ ingresos|floatformat:2 }}</h5>
                     <p class="card-text">Ingresos</p>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
-    <div class="card mt-4">
+    <!-- ========== PEDIDOS RECIENTES (para todos los roles) ========== -->
+    <div class="card mt-4 shadow-sm">
         <div class="card-header"><i class="fas fa-list"></i> Pedidos Recientes</div>
         <div class="card-body table-responsive">
-            {% if pedidos %}
+            {% if pedidos_recientes %}
             <table class="table table-striped">
                 <thead>
                     <tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Total</th></tr>
                 </thead>
                 <tbody>
-                    {% for p in pedidos %}
+                    {% for p in pedidos_recientes %}
                     <tr>
                         <td>{{ p.id_pedido }}</td>
                         <td>{{ p.fecha_pedido|date:"d/m/Y H:i" }}</td>
@@ -63,9 +72,126 @@
                 </tbody>
             </table>
             {% else %}
-            <div class="alert alert-info">No hay pedidos registrados</div>
+            <div class="alert alert-info mb-0">No hay pedidos registrados.</div>
             {% endif %}
         </div>
     </div>
+
+    <!-- ========== SECCIÓN EXCLUSIVA PARA ADMIN ========== -->
+    {% if user.rol == 'admin' %}
+    <hr class="my-5">
+    <h3 class="mb-4"><i class="fas fa-chart-pie"></i> Estadísticas Avanzadas</h3>
+
+    <div class="row">
+        <!-- Caja -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white"><i class="fas fa-cash-register"></i> Caja</div>
+                <div class="card-body">
+                    <p><strong>Cajas abiertas:</strong> {{ cajas_abiertas }}</p>
+                    <p><strong>Ingresos totales:</strong> ${{ total_ingresos_caja|floatformat:2 }}</p>
+                    <p><strong>Egresos totales:</strong> ${{ total_egresos_caja|floatformat:2 }}</p>
+                    <p><strong>Neto en caja:</strong> ${{ caja_neta|floatformat:2 }}</p>
+                    <p><strong>Movimientos hoy:</strong> {{ movimientos_hoy }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Insumos críticos -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark"><i class="fas fa-flask"></i> Insumos Críticos</div>
+                <div class="card-body">
+                    <p><strong>Agotados:</strong> <span class="badge bg-danger">{{ insumos_agotados }}</span></p>
+                    <p><strong>Stock bajo:</strong> <span class="badge bg-warning text-dark">{{ insumos_bajos }}</span></p>
+                    <p><strong>Lotes próximos a caducar (7 días):</strong> {{ lotes_proximos_caducar }}</p>
+                    <p><strong>Lotes activos:</strong> {{ total_lotes_activos }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Producción -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white"><i class="fas fa-industry"></i> Producción</div>
+                <div class="card-body">
+                    <p><strong>Unidades en almacén:</strong> {{ productos_almacen }}</p>
+                    <p><strong>Unidades en mostrador:</strong> {{ productos_mostrador }}</p>
+                    <h6 class="mt-3">Últimas fabricaciones</h6>
+                    <ul class="list-group">
+                        {% for fab in ultimas_fabricaciones %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ fab.id_producto.nombre }}
+                            <span class="badge bg-secondary">{{ fab.cantidad }} uds</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">Sin registros</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ventas -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white"><i class="fas fa-receipt"></i> Ventas</div>
+                <div class="card-body">
+                    <p><strong>Total ventas:</strong> ${{ total_ventas|floatformat:2 }}</p>
+                    <p><strong>Número de ventas:</strong> {{ num_ventas }}</p>
+                    <h6 class="mt-3">Últimas ventas</h6>
+                    <ul class="list-group">
+                        {% for v in ultimas_ventas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ v.ticket }}
+                            <span class="badge bg-success">${{ v.total|floatformat:2 }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">Sin ventas</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pedidos por estado -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-secondary text-white"><i class="fas fa-chart-bar"></i> Pedidos por Estado</div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead><tr><th>Estado</th><th>Cantidad</th></tr></thead>
+                        <tbody>
+                            {% for item in pedidos_por_estado %}
+                            <tr><td>{{ item.estado|default:"Sin estado" }}</td><td>{{ item.total }}</td></tr>
+                            {% empty %}
+                            <tr><td colspan="2">Sin datos</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs recientes -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-dark"><i class="fas fa-history"></i> Actividad Reciente</div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for log in logs_recientes %}
+                        <li class="list-group-item">
+                            <strong>{{ log.accion }}</strong> - {{ log.fecha|date:"d/m/Y H:i" }}
+                            <br><small class="text-muted">{{ log.descripcion }}</small>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">Sin actividad registrada</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

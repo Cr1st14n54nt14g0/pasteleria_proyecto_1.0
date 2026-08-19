@@ -39,7 +39,7 @@ class Productos(models.Model):
  
 class Ventas(models.Model):
     id_venta = models.AutoField(primary_key=True)
-    id_usuario = models.ForeignKey('Usuarios', models.DO_NOTHING, db_column='id_usuario')
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_usuario')
     id_pedido = models.ForeignKey('Pedidos', models.DO_NOTHING, db_column='id_pedido', blank=True, null=True)
     fecha_venta = models.DateTimeField()
     total = models.DecimalField(max_digits=10, decimal_places=2)
@@ -64,9 +64,12 @@ class EquiposDeRefrigeracion(models.Model):
     nombre_equipo = models.CharField(unique=True, max_length=100)
     tipo = models.CharField(max_length=50)
     estado = models.CharField(max_length=17, blank=True, null=True)
- 
+
     class Meta:
         db_table = 'equipos_de_refrigeracion'
+
+    def __str__(self):
+        return self.nombre_equipo
  
  
 class Insumos(models.Model):
@@ -78,9 +81,14 @@ class Insumos(models.Model):
     fecha_compra = models.DateField(blank=True, null=True)
     fecha_caducidad = models.DateField(blank=True, null=True)
 
-    def __str__(self):
-        return self.nombre_insumo
- 
+    # Nuevo campo para el estado automático
+    ESTADOS_INSUMO = [
+        ('disponible', 'Disponible'),
+        ('bajo', 'Stock bajo'),
+        ('agotado', 'Agotado'),
+    ]
+    estado = models.CharField(max_length=10, choices=ESTADOS_INSUMO, default='disponible', editable=False)
+
     class Meta:
         db_table = 'insumos'
  
@@ -98,13 +106,16 @@ class Inventario(models.Model):
 class Mantenimientos(models.Model):
     id_mantenimiento = models.AutoField(primary_key=True)
     id_equipo = models.ForeignKey(EquiposDeRefrigeracion, models.DO_NOTHING, db_column='id_equipo')
-    id_encargado = models.ForeignKey('Usuarios', models.DO_NOTHING, db_column='id_encargado')
+    id_encargado = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_encargado')
     fecha_mantenimiento = models.DateField()
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     proximo_mantenimiento = models.DateField(blank=True, null=True)
- 
+
     class Meta:
         db_table = 'mantenimientos'
+
+    def __str__(self):
+        return f"Mantenimiento {self.id_mantenimiento} - {self.id_equipo.nombre_equipo}"
  
  
 class Pedidos(models.Model):
@@ -205,8 +216,7 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
 
 class Caja(models.Model):
     id_caja = models.AutoField(primary_key=True)
-    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, db_column='id_usuario')
-    fecha_apertura = models.DateTimeField(auto_now_add=True)
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_usuario')
     fecha_cierre = models.DateTimeField(null=True, blank=True)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     monto_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -228,8 +238,7 @@ class MovimientoCaja(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     descripcion = models.CharField(max_length=255, blank=True)
     fecha = models.DateTimeField(auto_now_add=True)
-    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, db_column='id_usuario')
-
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_usuario')
     class Meta:
         db_table = 'movimientos_caja'
 

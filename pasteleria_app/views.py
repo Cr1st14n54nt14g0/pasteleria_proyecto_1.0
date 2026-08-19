@@ -33,7 +33,16 @@ from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
 from .forms import LoteInsumoForm, FabricacionForm, MostradorForm
 
 from django.utils import timezone
-from .models import Caja, ConfiguracionCaja
+from .models import Caja, ConfiguracionCaja, MovimientoCaja
+
+from .models import EquiposDeRefrigeracion, Mantenimientos
+from .forms import EquipoForm, MantenimientoForm
+
+from django.db.models import Count, Sum, Q
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models.functions import Cast
+from django.db.models import FloatField
 
 @login_required
 @require_GET
@@ -83,18 +92,17 @@ def login_view(request):
 # ------------------------------------------------------------
 @login_required
 def dashboard(request):
+    # ========== ESTADÍSTICAS BÁSICAS (todos los roles) ==========
     total_productos = Productos.objects.count()
     total_pedidos = Pedidos.objects.count()
     pedidos_pendientes = Pedidos.objects.filter(estado='pendiente').count()
 
-    # Suma de ventas (campo total es JSONField)
+    # Ingresos totales (usando Cast para campos DecimalField)
     ingresos = Ventas.objects.annotate(
         total_num=Cast('total', FloatField())
-    ).aggregate(
-        total=Sum('total_num')
-    )['total'] or 0
+    ).aggregate(total=Sum('total_num'))['total'] or 0
 
-    pedidos = Pedidos.objects.all().order_by('-fecha_pedido')[:5]
+    pedidos_recientes = Pedidos.objects.all().order_by('-fecha_pedido')[:5]
 
     contexto = {
         'active_page': 'dashboard',
@@ -102,10 +110,70 @@ def dashboard(request):
         'total_pedidos': total_pedidos,
         'pedidos_pendientes': pedidos_pendientes,
         'ingresos': ingresos,
-        'pedidos': pedidos,
+        'pedidos_recientes': pedidos_recientes,
     }
-    return render(request, 'pasteleria_app/dashboard.html', contexto)
 
+    # ========== ESTADÍSTICAS AVANZADAS (solo admin) ==========
+    if request.user.rol == 'admin':
+        # --- Caja ---
+        cajas_abiertas = Caja.objects.filter(estado='abierta').count()
+        total_ingresos_caja = MovimientoCaja.objects.filter(
+            Q(tipo='adelanto') | Q(tipo='pago_final') | Q(tipo='otro_ingreso')
+        ).aggregate(total=Sum('monto'))['total'] or 0
+        total_egresos_caja = MovimientoCaja.objects.filter(tipo='egreso').aggregate(total=Sum('monto'))['total'] or 0
+        caja_neta = total_ingresos_caja - total_egresos_caja
+        movimientos_hoy = MovimientoCaja.objects.filter(fecha__date=timezone.now().date()).count()
+
+        # --- Pedidos por estado ---
+        pedidos_por_estado = Pedidos.objects.values('estado').annotate(total=Count('id_pedido'))
+
+        # --- Insumos en estado crítico ---
+        insumos_agotados = Insumos.objects.filter(estado='agotado').count()
+        insumos_bajos = Insumos.objects.filter(estado='bajo').count()
+
+        # --- Lotes próximos a caducar (7 días) ---
+        fecha_limite = timezone.now().date() + timedelta(days=7)
+        lotes_proximos_caducar = LoteInsumo.objects.filter(
+            fecha_caducidad__lte=fecha_limite,
+            fecha_caducidad__gte=timezone.now().date(),
+            cantidad__gt=0
+        ).count()
+        total_lotes_activos = LoteInsumo.objects.filter(cantidad__gt=0).count()
+
+        # --- Producción y almacenes ---
+        productos_almacen = ProductoAlmacen.objects.aggregate(total=Sum('cantidad'))['total'] or 0
+        productos_mostrador = ProductoMostrador.objects.aggregate(total=Sum('cantidad'))['total'] or 0
+        ultimas_fabricaciones = ProductoAlmacen.objects.select_related('id_producto').order_by('-fecha_ingreso')[:5]
+
+        # --- Ventas ---
+        total_ventas = Ventas.objects.aggregate(total=Sum('total'), num=Count('id_venta'))
+        ultimas_ventas = Ventas.objects.order_by('-fecha_venta')[:5]
+
+        # --- Registro de actividad ---
+        logs_recientes = Log.objects.select_related('usuario').order_by('-fecha')[:5]
+
+        # Añadir al contexto
+        contexto.update({
+            'cajas_abiertas': cajas_abiertas,
+            'total_ingresos_caja': total_ingresos_caja,
+            'total_egresos_caja': total_egresos_caja,
+            'caja_neta': caja_neta,
+            'movimientos_hoy': movimientos_hoy,
+            'pedidos_por_estado': pedidos_por_estado,
+            'insumos_agotados': insumos_agotados,
+            'insumos_bajos': insumos_bajos,
+            'lotes_proximos_caducar': lotes_proximos_caducar,
+            'total_lotes_activos': total_lotes_activos,
+            'productos_almacen': productos_almacen,
+            'productos_mostrador': productos_mostrador,
+            'ultimas_fabricaciones': ultimas_fabricaciones,
+            'total_ventas': total_ventas.get('total') or 0,
+            'num_ventas': total_ventas.get('num') or 0,
+            'ultimas_ventas': ultimas_ventas,
+            'logs_recientes': logs_recientes,
+        })
+
+    return render(request, 'pasteleria_app/dashboard.html', contexto)
 # ------------------------------------------------------------
 # Pedidos
 # ------------------------------------------------------------
@@ -556,35 +624,33 @@ def crear_usuario(request):
         form = UsuarioForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            # Guardar usuario primero para obtener id_usuario (si es nuevo) o actualizar
+            # Bloqueo extra de admin
+            if user.rol == 'admin':
+                messages.error(request, "No se puede crear un usuario con rol de administrador.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            password = form.cleaned_data.get('password')
+            if not password:
+                messages.error(request, "Debe ingresar una contraseña para el nuevo usuario.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            user.set_password(password)   # ← Esto genera el hash en user.password
+            user.is_active = True
+            user.is_staff = False
             user.save()
-            # Crear o actualizar DatosPersonales
-            datos, created = DatosPersonales.objects.update_or_create(
+
+            DatosPersonales.objects.create(
                 id_usuario=user.id_usuario,
-                defaults={
-                    'nombres': form.cleaned_data.get('nombres', ''),
-                    'apellidos': form.cleaned_data.get('apellidos', ''),
-                    'telefono': form.cleaned_data.get('telefono', ''),
-                    'direccion': form.cleaned_data.get('direccion', ''),
-                }
+                nombres=form.cleaned_data['nombres'],
+                apellidos=form.cleaned_data['apellidos'],
+                telefono=form.cleaned_data['telefono'],
+                direccion=form.cleaned_data['direccion']
             )
-            # Asignar la relación OneToOne (si no existe) desde Usuarios a DatosPersonales
-            if not hasattr(user, 'datos_personales') or user.datos_personales is None:
-                user.datos_personales = datos
-                user.save()
-            else:
-                # Si ya tenía uno, actualizamos los datos
-                user.datos_personales = datos
-                user.save()
-            messages.success(request, 'Usuario creado exitosamente.')
+            messages.success(request, "Usuario creado correctamente.")
             return redirect('lista_usuarios')
     else:
         form = UsuarioForm()
-    return render(request, 'pasteleria_app/usuario_form.html', {
-        'form': form,
-        'active_page': 'usuarios',
-        'titulo': 'Nuevo Usuario'
-    })
+    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
 
 @login_required
 @role_required(['admin'])
@@ -1012,3 +1078,56 @@ def gestionar_cajas(request):
     }
     return render(request, 'pasteleria_app/gestionar_cajas.html', contexto)
 
+# ========== Equipos ==========
+class EquipoListView(RoleRequiredMixin, ListView):
+    model = EquiposDeRefrigeracion
+    template_name = 'pasteleria_app/lista_equipos.html'
+    context_object_name = 'equipos'
+    required_roles = ['admin']
+
+class EquipoCreateView(RoleRequiredMixin, CreateView):
+    model = EquiposDeRefrigeracion
+    form_class = EquipoForm
+    template_name = 'pasteleria_app/equipo_form.html'
+    success_url = reverse_lazy('lista_equipos')
+    required_roles = ['admin']
+
+class EquipoUpdateView(RoleRequiredMixin, UpdateView):
+    model = EquiposDeRefrigeracion
+    form_class = EquipoForm
+    template_name = 'pasteleria_app/equipo_form.html'
+    success_url = reverse_lazy('lista_equipos')
+    required_roles = ['admin']
+
+class EquipoDeleteView(RoleRequiredMixin, DeleteView):
+    model = EquiposDeRefrigeracion
+    template_name = 'pasteleria_app/equipo_confirm_delete.html'
+    success_url = reverse_lazy('lista_equipos')
+    required_roles = ['admin']
+
+# ========== Mantenimientos ==========
+class MantenimientoListView(RoleRequiredMixin, ListView):
+    model = Mantenimientos
+    template_name = 'pasteleria_app/lista_mantenimientos.html'
+    context_object_name = 'mantenimientos'
+    required_roles = ['admin']
+
+class MantenimientoCreateView(RoleRequiredMixin, CreateView):
+    model = Mantenimientos
+    form_class = MantenimientoForm
+    template_name = 'pasteleria_app/mantenimiento_form.html'
+    success_url = reverse_lazy('lista_mantenimientos')
+    required_roles = ['admin']
+
+class MantenimientoUpdateView(RoleRequiredMixin, UpdateView):
+    model = Mantenimientos
+    form_class = MantenimientoForm
+    template_name = 'pasteleria_app/mantenimiento_form.html'
+    success_url = reverse_lazy('lista_mantenimientos')
+    required_roles = ['admin']
+
+class MantenimientoDeleteView(RoleRequiredMixin, DeleteView):
+    model = Mantenimientos
+    template_name = 'pasteleria_app/mantenimiento_confirm_delete.html'
+    success_url = reverse_lazy('lista_mantenimientos')
+    required_roles = ['admin']

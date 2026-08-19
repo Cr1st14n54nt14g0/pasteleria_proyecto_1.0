@@ -1,0 +1,40 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Mantenimientos - Pastelería{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2><i class="fas fa-tools"></i> Mantenimientos</h2>
+    <a href="{% url 'crear_mantenimiento' %}" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Nuevo Mantenimiento</a>
+    <div class="card">
+        <div class="card-header">Historial de Mantenimientos</div>
+        <div class="card-body table-responsive">
+            {% if mantenimientos %}
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr><th>ID</th><th>Equipo</th><th>Encargado</th><th>Fecha</th><th>Descripción</th><th>Próximo</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    {% for m in mantenimientos %}
+                    <tr>
+                        <td>{{ m.id_mantenimiento }}</td>
+                        <td>{{ m.id_equipo.nombre_equipo }}</td>
+                        <td>{{ m.id_encargado.usuario }}</td>
+                        <td>{{ m.fecha_mantenimiento|date:"d/m/Y" }}</td>
+                        <td>{{ m.descripcion|default:"-" }}</td>
+                        <td>{{ m.proximo_mantenimiento|date:"d/m/Y"|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'editar_mantenimiento' m.pk %}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
+                            <a href="{% url 'eliminar_mantenimiento' m.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7">No hay mantenimientos registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">No hay mantenimientos.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

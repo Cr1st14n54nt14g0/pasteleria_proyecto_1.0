@@ -4,6 +4,7 @@ from .models import Inventario
 from django import forms
 from .models import Usuarios, DatosPersonales
 from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
+from .models import EquiposDeRefrigeracion, Mantenimientos
 
 
 class ProductoForm(forms.ModelForm):
@@ -48,7 +49,7 @@ class UsuarioForm(forms.ModelForm):
     password = forms.CharField(
         label="Contraseña",
         required=False,
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Dejar en blanco para no cambiarla'}),
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
         help_text="Solo si desea cambiarla."
     )
     nombres = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
@@ -58,11 +59,10 @@ class UsuarioForm(forms.ModelForm):
 
     class Meta:
         model = Usuarios
-        fields = ['usuario', 'rol', 'estado']
+        fields = ['usuario', 'rol']  # no incluir 'password' ni 'contrasena'
         widgets = {
             'usuario': forms.TextInput(attrs={'class': 'form-control'}),
             'rol': forms.Select(attrs={'class': 'form-select'}),
-            'estado': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -226,4 +226,26 @@ class MostradorForm(forms.ModelForm):
         fields = ['id_producto', 'cantidad', 'id_pedido']
         widgets = {
             'id_pedido': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class EquipoForm(forms.ModelForm):
+    class Meta:
+        model = EquiposDeRefrigeracion
+        fields = ['nombre_equipo', 'tipo', 'estado']
+        widgets = {
+            'nombre_equipo': forms.TextInput(attrs={'class': 'form-control'}),
+            'tipo': forms.TextInput(attrs={'class': 'form-control'}),
+            'estado': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+class MantenimientoForm(forms.ModelForm):
+    class Meta:
+        model = Mantenimientos
+        fields = ['id_equipo', 'id_encargado', 'fecha_mantenimiento', 'descripcion', 'proximo_mantenimiento']
+        widgets = {
+            'id_equipo': forms.Select(attrs={'class': 'form-select'}),
+            'id_encargado': forms.Select(attrs={'class': 'form-select'}),
+            'fecha_mantenimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'proximo_mantenimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
