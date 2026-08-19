@@ -217,6 +217,7 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
 class Caja(models.Model):
     id_caja = models.AutoField(primary_key=True)
     id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='id_usuario')
+    fecha_apertura = models.DateTimeField(auto_now_add=True) 
     fecha_cierre = models.DateTimeField(null=True, blank=True)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     monto_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
