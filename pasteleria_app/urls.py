@@ -78,4 +78,6 @@ urlpatterns = [
     path('mostrador/<int:pk>/eliminar/', views.eliminar_mostrador, name='eliminar_mostrador'),
 
     path('usuarios/<int:pk>/toggle-activo/', views.toggle_usuario_activo, name='toggle_usuario_activo'),
+    path('cajas/gestion/', views.gestionar_cajas, name='gestionar_cajas'),
+    
 ]

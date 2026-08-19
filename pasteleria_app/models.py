@@ -281,3 +281,12 @@ class ProductoMostrador(models.Model):
     class Meta:
         db_table = 'producto_mostrador'
 
+class ConfiguracionCaja(models.Model):
+    max_cajas_activas = models.PositiveIntegerField(default=1)
+    tiempo_maximo_minutos = models.PositiveIntegerField(default=120)  # 2 horas
+
+    class Meta:
+        db_table = 'configuracion_caja'
+
+    def __str__(self):
+        return f"Configuración de caja (máx: {self.max_cajas_activas}, tiempo: {self.tiempo_maximo_minutos} min)"

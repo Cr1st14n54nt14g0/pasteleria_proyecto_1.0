@@ -32,6 +32,9 @@ from django.core.exceptions import PermissionDenied
 from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
 from .forms import LoteInsumoForm, FabricacionForm, MostradorForm
 
+from django.utils import timezone
+from .models import Caja, ConfiguracionCaja
+
 @login_required
 @require_GET
 def calcular_insumos_api(request):
@@ -904,4 +907,108 @@ def eliminar_mostrador(request, pk):
         registrar_log(request.user, 'Retiro mostrador', producto)
         return redirect('lista_mostrador')
     return render(request, 'pasteleria_app/mostrador_confirm_delete.html', {'object': item, 'active_page': 'mostrador'})
+
+@login_required
+@role_required(['cajero'])   # Solo cajero, admin no debería abrir caja
+def abrir_caja(request):
+    # Cerrar cajas vencidas
+    config = ConfiguracionCaja.objects.first()
+    if config:
+        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
+        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
+            estado='cerrada',
+            fecha_cierre=timezone.now()
+        )
+
+    cajas_abiertas = Caja.objects.filter(estado='abierta').count()
+    max_permitido = config.max_cajas_activas if config else 1
+
+    if cajas_abiertas >= max_permitido:
+        messages.error(request, f"Ya hay {cajas_abiertas} cajas abiertas. El máximo permitido es {max_permitido}.")
+        return redirect('dashboard')  # o a una vista de caja
+
+    if request.method == 'POST':
+        monto_inicial = request.POST.get('monto_inicial', 0)
+        Caja.objects.create(
+            id_usuario=request.user,
+            monto_inicial=monto_inicial
+        )
+        messages.success(request, "Caja abierta correctamente.")
+        return redirect('dashboard')
+    return render(request, 'pasteleria_app/abrir_caja.html', {'active_page': 'caja'})
+
+@login_required
+@role_required(['cajero'])
+def cerrar_caja(request):
+    caja_abierta = Caja.objects.filter(estado='abierta', id_usuario=request.user).order_by('-fecha_apertura').first()
+    if not caja_abierta:
+        messages.error(request, "No tienes ninguna caja abierta.")
+        return redirect('dashboard')
+
+    # Verificar tiempo excedido automáticamente
+    config = ConfiguracionCaja.objects.first()
+    if config:
+        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
+        if caja_abierta.fecha_apertura < limite:
+            caja_abierta.estado = 'cerrada'
+            caja_abierta.fecha_cierre = timezone.now()
+            caja_abierta.save()
+            messages.info(request, "La caja fue cerrada automáticamente por exceder el tiempo máximo.")
+            return redirect('dashboard')
+
+    if request.method == 'POST':
+        monto_final = request.POST.get('monto_final')
+        caja_abierta.monto_final = monto_final
+        caja_abierta.fecha_cierre = timezone.now()
+        caja_abierta.estado = 'cerrada'
+        caja_abierta.save()
+        messages.success(request, "Caja cerrada correctamente.")
+        return redirect('dashboard')
+
+    return render(request, 'pasteleria_app/cerrar_caja.html', {'caja': caja_abierta, 'active_page': 'caja'})
+
+
+@login_required
+@role_required(['admin'])
+def gestionar_cajas(request):
+    config, _ = ConfiguracionCaja.objects.get_or_create(pk=1)
+
+    if request.method == 'POST':
+        # Si es para cerrar una caja específica
+        if 'cerrar_caja_id' in request.POST:
+            caja_id = request.POST.get('cerrar_caja_id')
+            caja = get_object_or_404(Caja, pk=caja_id)
+            caja.estado = 'cerrada'
+            caja.fecha_cierre = timezone.now()
+            caja.save()
+            messages.success(request, f"Caja {caja.id_caja} cerrada manualmente.")
+            registrar_log(request.user, 'Cierre manual de caja', f"Caja {caja.id_caja}")
+            return redirect('gestionar_cajas')
+
+        # Si es para guardar configuración
+        config.max_cajas_activas = request.POST.get('max_cajas_activas')
+        config.tiempo_maximo_minutos = request.POST.get('tiempo_maximo_minutos')
+        config.save()
+        messages.success(request, "Configuración de cajas actualizada.")
+        return redirect('gestionar_cajas')
+
+    # Cerrar automáticamente cajas vencidas
+    if config.tiempo_maximo_minutos:
+        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
+        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
+            estado='cerrada',
+            fecha_cierre=timezone.now()
+        )
+
+    cajas_activas = Caja.objects.filter(estado='abierta')
+    todas_cajas = Caja.objects.all().order_by('-fecha_apertura')
+
+    contexto = {
+        'active_page': 'gestion_cajas',
+        'config': config,
+        'cajas': todas_cajas,
+        'cajas_activas': cajas_activas,
+        'num_cajas_activas': cajas_activas.count(),
+    }
+    return render(request, 'pasteleria_app/gestionar_cajas.html', contexto)
 

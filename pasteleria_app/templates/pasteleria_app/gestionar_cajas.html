@@ -1,0 +1,91 @@
+{% extends 'pasteleria_app/base.html' %}
+{% block title %}Gestión de Cajas{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="fas fa-cash-register"></i> Gestión de Cajas</h2>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Cajas activas</h5>
+                    <h2 class="display-4">{{ num_cajas_activas }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">Configuración</div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Máximo de cajas activas</label>
+                                <input type="number" name="max_cajas_activas" class="form-control" value="{{ config.max_cajas_activas }}" min="1">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tiempo máximo (minutos)</label>
+                                <input type="number" name="tiempo_maximo_minutos" class="form-control" value="{{ config.tiempo_maximo_minutos }}" min="1">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Todas las cajas</div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Apertura</th>
+                        <th>Cierre</th>
+                        <th>Estado</th>
+                        <th>Monto inicial</th>
+                        <th>Monto final</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for caja in cajas %}
+                    <tr>
+                        <td>{{ caja.id_caja }}</td>
+                        <td>{{ caja.id_usuario.usuario }}</td>
+                        <td>{{ caja.fecha_apertura|date:"d/m/Y H:i" }}</td>
+                        <td>{{ caja.fecha_cierre|date:"d/m/Y H:i"|default:"-" }}</td>
+                        <td>
+                            {% if caja.estado == 'abierta' %}
+                                <span class="badge bg-success">Abierta</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Cerrada</span>
+                            {% endif %}
+                        </td>
+                        <td>${{ caja.monto_inicial|floatformat:2 }}</td>
+                        <td>${{ caja.monto_final|floatformat:2|default:"-" }}</td>
+                        <td>
+                            {% if caja.estado == 'abierta' %}
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="cerrar_caja_id" value="{{ caja.id_caja }}">
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Cerrar caja">
+                                        <i class="fas fa-stop-circle"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8">No hay cajas registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
