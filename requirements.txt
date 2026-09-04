@@ -1,10 +1,12 @@
-asgiref==3.11.1
-dj-database-url==3.1.2
-Django==6.0.7
-gunicorn==26.0.0
-packaging==26.2
-psycopg2-binary==2.9.12
-python-decouple==3.8
-sqlparse==0.5.5
-tzdata==2026.3
-whitenoise==6.12.0
+asgiref==3.11.1         #6 Dependencia interna de Django para soporte ASGI (comunicación asíncrona).
+dj-database-url==3.1.2  #2 Permite configurar la base de datos mediante una URL (DATABASE_URL).
+Django==6.0.7           #9 Framework web principal. Proporciona ORM, formularios, autenticación, plantillas, señales, etc.
+gunicorn==26.0.0        #4 Servidor WSGI para producción (usado en Render).
+packaging==26.2         #10 Manejo de versiones y empaquetado de Python, requerida por Gunicorn.
+psycopg2-binary==2.9.12 #1 Adaptador para conectar Django con PostgreSQL.
+python-decouple==3.8    #3 Lee variables de entorno desde un archivo .env o variables del sistema.
+sqlparse==0.5.5         #7 Utilidad para formatear y analizar consultas SQL (usada por Django).
+tzdata==2026.3          #8 Base de datos de zonas horarias para Python (evita problemas con fechas).
+whitenoise==6.12.0      #5 Sirve archivos estáticos (CSS, JS, imágenes) en producción sin necesidad de un servidor web adicional.
+
+# asgiref, dj-database-url, gunicorn, packaging

@@ -1,13 +1,70 @@
 {% extends 'pasteleria_app/base.html' %}
 {% block title %}{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Mantenimiento{% endblock %}
 {% block content %}
-<div class="container mt-4">
-    <h2>{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Mantenimiento</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Guardar</button>
-        <a href="{% url 'lista_mantenimientos' %}" class="btn btn-secondary">Cancelar</a>
-    </form>
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools"></i>
+                        {% if form.instance.pk %}Editar Mantenimiento{% else %}Nuevo Mantenimiento{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_id_equipo" class="form-label">Equipo <span class="text-danger">*</span></label>
+                                {{ form.id_equipo }}
+                                {% for error in form.id_equipo.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_id_encargado" class="form-label">Encargado <span class="text-danger">*</span></label>
+                                {{ form.id_encargado }}
+                                {% for error in form.id_encargado.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_fecha_mantenimiento" class="form-label">Fecha de mantenimiento <span class="text-danger">*</span></label>
+                                {{ form.fecha_mantenimiento }}
+                                {% for error in form.fecha_mantenimiento.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_proximo_mantenimiento" class="form-label">Próximo mantenimiento</label>
+                                {{ form.proximo_mantenimiento }}
+                                {% for error in form.proximo_mantenimiento.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_descripcion" class="form-label">Descripción</label>
+                            {{ form.descripcion }}
+                            {% for error in form.descripcion.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'lista_mantenimientos' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Guardar Mantenimiento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

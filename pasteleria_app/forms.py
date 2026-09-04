@@ -3,7 +3,7 @@ from .models import Productos, Insumos, Pedidos, EquiposDeRefrigeracion, Manteni
 from .models import Inventario
 from django import forms
 from .models import Usuarios, DatosPersonales
-from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
+from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador, ProductoInsumos
 from .models import EquiposDeRefrigeracion, Mantenimientos
 
 
@@ -48,9 +48,9 @@ class InventarioForm(forms.ModelForm):
 class UsuarioForm(forms.ModelForm):
     password = forms.CharField(
         label="Contraseña",
-        required=False,
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        help_text="Solo si desea cambiarla."
+        required=True,                      # Ahora es obligatoria al crear
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Contraseña'}),
+        help_text="Requerida para nuevos usuarios."
     )
     nombres = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     apellidos = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
@@ -59,7 +59,7 @@ class UsuarioForm(forms.ModelForm):
 
     class Meta:
         model = Usuarios
-        fields = ['usuario', 'rol']  # no incluir 'password' ni 'contrasena'
+        fields = ['usuario', 'rol']
         widgets = {
             'usuario': forms.TextInput(attrs={'class': 'form-control'}),
             'rol': forms.Select(attrs={'class': 'form-select'}),
@@ -67,22 +67,23 @@ class UsuarioForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Excluir 'ayudante' y 'admin' (admin ya lo excluyes en la vista)
         roles_permitidos = [
             ('cajero', 'Cajero'),
             ('cocinero', 'Cocinero/Pastelero'),
-            ('ayudante', 'Ayudante'),
         ]
         self.fields['rol'].choices = roles_permitidos
-        if self.instance.pk and self.instance.rol == 'admin':
-            self.fields['rol'].disabled = True
-            self.fields['rol'].choices = [('admin', 'Administrador')] + roles_permitidos
+        # Si estamos editando un usuario existente, la contraseña no es obligatoria
+        if self.instance.pk:
+            self.fields['password'].required = False
+            self.fields['password'].help_text = "Dejar en blanco para mantener la actual."
 
 class UsuarioForm(forms.ModelForm):
     password = forms.CharField(
         label="Contraseña",
-        required=False,
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Dejar en blanco para no cambiarla'}),
-        help_text="Solo si desea cambiarla."
+        required=True,
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        help_text="Requerida para nuevos usuarios."
     )
     nombres = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     apellidos = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
@@ -102,7 +103,6 @@ class UsuarioForm(forms.ModelForm):
         roles_permitidos = [
             ('cajero', 'Cajero'),
             ('cocinero', 'Cocinero/Pastelero'),
-            ('ayudante', 'Ayudante'),
         ]
         self.fields['rol'].choices = roles_permitidos
         if self.instance.pk and self.instance.rol == 'admin':
@@ -233,9 +233,18 @@ class EquipoForm(forms.ModelForm):
         model = EquiposDeRefrigeracion
         fields = ['nombre_equipo', 'tipo', 'estado']
         widgets = {
-            'nombre_equipo': forms.TextInput(attrs={'class': 'form-control'}),
-            'tipo': forms.TextInput(attrs={'class': 'form-control'}),
-            'estado': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre_equipo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nombre del equipo'
+            }),
+            'tipo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Refrigerador, Congelador'
+            }),
+            'estado': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Activo, En reparación'
+            }),
         }
 
 class MantenimientoForm(forms.ModelForm):
@@ -248,4 +257,13 @@ class MantenimientoForm(forms.ModelForm):
             'fecha_mantenimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'proximo_mantenimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+class ProductoInsumoForm(forms.ModelForm):
+    class Meta:
+        model = ProductoInsumos
+        fields = ['id_insumo', 'cantidad']
+        widgets = {
+            'id_insumo': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }

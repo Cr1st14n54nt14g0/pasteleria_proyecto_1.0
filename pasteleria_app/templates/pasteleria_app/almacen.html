@@ -34,7 +34,7 @@
                         <td>{{ p.categoria }}</td>
                         <td>
                             {% if user.rol == 'admin' or user.rol == 'cocinero' %}
-                                <a href="{% url 'producir_producto' p.pk %}" class="btn btn-sm btn-success" title="Fabricar"><i class="fas fa-industry"></i></a>
+                                <a href="{% url 'fabricar_producto' %}" class="btn btn-sm btn-success" title="Fabricar"><i class="fas fa-industry"></i></a>
                                 <a href="{% url 'producto_update' p.pk %}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
                                 <a href="{% url 'producto_delete' p.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
                             {% endif %}

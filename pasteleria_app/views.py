@@ -1,79 +1,64 @@
-from .utils import registrar_log
+# ===========================
+# IMPORTS
+# ===========================
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
-from .forms import UsuarioForm
-from django.views.generic import ListView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy
 from django.conf import settings
-from django.db.models import Sum, Count, Max, FloatField
+from django.db.models import Sum, Count, Max, Q, FloatField
 from django.db.models.functions import Cast
+from django.utils import timezone
+from datetime import timedelta
+from django.forms import inlineformset_factory
+from .models import Productos, ProductoInsumos
+from .forms import ProductoInsumoForm
+
+ProductoInsumoFormSet = inlineformset_factory(
+    Productos,
+    ProductoInsumos,
+    form=ProductoInsumoForm,
+    extra=1,
+    can_delete=True
+)
+
 from .models import (
     DatosPersonales, Productos, Insumos, Pedidos, Ventas, DetalleVenta,
     EquiposDeRefrigeracion, Mantenimientos, Inventario, ProductoInsumos,
-    Usuarios
+    Usuarios, Caja, MovimientoCaja, ConfiguracionCaja, Log,
+    LoteInsumo, ProductoAlmacen, ProductoMostrador
 )
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, UpdateView, DeleteView
-from django.utils.decorators import method_decorator
+from .forms import (
+    UsuarioForm, ProductoForm, InsumoForm, PedidoForm, EquipoForm,
+    MantenimientoForm, DatosPersonalesForm, InventarioForm,
+    LoteInsumoForm, FabricacionForm, MostradorForm
+)
 from .decorators import role_required
-from .forms import ProductoForm, InsumoForm, PedidoForm, EquipoForm, MantenimientoForm, DatosPersonalesForm
-from .forms import InventarioForm
-from .models import Caja
-from django.utils import timezone
-from .utils import registrar_log   # solo si creaste utils.py
-from .models import Log   # <-- agrega esta línea
+from .utils import registrar_log
 
-from django.http import JsonResponse
-from django.views.decorators.http import require_GET
-from django.core.exceptions import PermissionDenied
+# ===========================
+# MIXIN DE ROLES
+# ===========================
+class RoleRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    required_roles = []
 
-from .models import LoteInsumo, ProductoAlmacen, ProductoMostrador
-from .forms import LoteInsumoForm, FabricacionForm, MostradorForm
+    def test_func(self):
+        return self.request.user.rol in self.required_roles
 
-from django.utils import timezone
-from .models import Caja, ConfiguracionCaja, MovimientoCaja
+    def handle_no_permission(self):
+        if self.request.user.is_authenticated:
+            raise PermissionDenied("No tienes permiso para acceder a esta página.")
+        return super().handle_no_permission()
 
-from .models import EquiposDeRefrigeracion, Mantenimientos
-from .forms import EquipoForm, MantenimientoForm
-
-from django.db.models import Count, Sum, Q
-from django.utils import timezone
-from datetime import timedelta
-from django.db.models.functions import Cast
-from django.db.models import FloatField
-
-@login_required
-@require_GET
-def calcular_insumos_api(request):
-    producto_id = request.GET.get('producto_id')
-    cantidad = request.GET.get('cantidad', 1)
-    try:
-        cantidad = int(cantidad)
-    except ValueError:
-        return JsonResponse({'error': 'Cantidad no válida'}, status=400)
-
-    producto = get_object_or_404(Productos, pk=producto_id)
-    insumos = ProductoInsumos.objects.filter(id_producto=producto).select_related('id_insumo')
-    data = []
-    for item in insumos:
-        insumo = item.id_insumo
-        total_necesario = item.cantidad * cantidad
-        data.append({
-            'insumo': insumo.nombre_insumo,
-            'unidad': insumo.unidad,
-            'cantidad_por_unidad': item.cantidad,
-            'total_necesario': total_necesario,
-            'stock_actual': insumo.cantidad,
-            'suficiente': insumo.cantidad >= total_necesario,
-        })
-    return JsonResponse({'producto': producto.nombre, 'insumos': data})
-
-
-# ------------------------------------------------------------
-# Autenticación
-# ------------------------------------------------------------
+# ===========================
+# AUTENTICACIÓN
+# ===========================
 def login_view(request):
     error = None
     if request.method == 'POST':
@@ -87,17 +72,15 @@ def login_view(request):
             error = 'Usuario o contraseña incorrectos.'
     return render(request, 'registration/login.html', {'error': error})
 
-# ------------------------------------------------------------
-# Dashboard
-# ------------------------------------------------------------
+# ===========================
+# DASHBOARD
+# ===========================
 @login_required
 def dashboard(request):
-    # ========== ESTADÍSTICAS BÁSICAS (todos los roles) ==========
     total_productos = Productos.objects.count()
     total_pedidos = Pedidos.objects.count()
     pedidos_pendientes = Pedidos.objects.filter(estado='pendiente').count()
 
-    # Ingresos totales (usando Cast para campos DecimalField)
     ingresos = Ventas.objects.annotate(
         total_num=Cast('total', FloatField())
     ).aggregate(total=Sum('total_num'))['total'] or 0
@@ -113,25 +96,20 @@ def dashboard(request):
         'pedidos_recientes': pedidos_recientes,
     }
 
-    # ========== ESTADÍSTICAS AVANZADAS (solo admin) ==========
     if request.user.rol == 'admin':
-        # --- Caja ---
         cajas_abiertas = Caja.objects.filter(estado='abierta').count()
         total_ingresos_caja = MovimientoCaja.objects.filter(
-            Q(tipo='adelanto') | Q(tipo='pago_final') | Q(tipo='otro_ingreso')
+            tipo__in=['adelanto', 'pago_final', 'otro_ingreso']
         ).aggregate(total=Sum('monto'))['total'] or 0
         total_egresos_caja = MovimientoCaja.objects.filter(tipo='egreso').aggregate(total=Sum('monto'))['total'] or 0
         caja_neta = total_ingresos_caja - total_egresos_caja
         movimientos_hoy = MovimientoCaja.objects.filter(fecha__date=timezone.now().date()).count()
 
-        # --- Pedidos por estado ---
         pedidos_por_estado = Pedidos.objects.values('estado').annotate(total=Count('id_pedido'))
 
-        # --- Insumos en estado crítico ---
         insumos_agotados = Insumos.objects.filter(estado='agotado').count()
         insumos_bajos = Insumos.objects.filter(estado='bajo').count()
 
-        # --- Lotes próximos a caducar (7 días) ---
         fecha_limite = timezone.now().date() + timedelta(days=7)
         lotes_proximos_caducar = LoteInsumo.objects.filter(
             fecha_caducidad__lte=fecha_limite,
@@ -140,19 +118,15 @@ def dashboard(request):
         ).count()
         total_lotes_activos = LoteInsumo.objects.filter(cantidad__gt=0).count()
 
-        # --- Producción y almacenes ---
         productos_almacen = ProductoAlmacen.objects.aggregate(total=Sum('cantidad'))['total'] or 0
         productos_mostrador = ProductoMostrador.objects.aggregate(total=Sum('cantidad'))['total'] or 0
         ultimas_fabricaciones = ProductoAlmacen.objects.select_related('id_producto').order_by('-fecha_ingreso')[:5]
 
-        # --- Ventas ---
         total_ventas = Ventas.objects.aggregate(total=Sum('total'), num=Count('id_venta'))
         ultimas_ventas = Ventas.objects.order_by('-fecha_venta')[:5]
 
-        # --- Registro de actividad ---
         logs_recientes = Log.objects.select_related('usuario').order_by('-fecha')[:5]
 
-        # Añadir al contexto
         contexto.update({
             'cajas_abiertas': cajas_abiertas,
             'total_ingresos_caja': total_ingresos_caja,
@@ -174,640 +148,48 @@ def dashboard(request):
         })
 
     return render(request, 'pasteleria_app/dashboard.html', contexto)
-# ------------------------------------------------------------
-# Pedidos
-# ------------------------------------------------------------
-@login_required
-@role_required(['admin', 'cajero', 'cocinero'])
-def lista_pedidos(request):
-    pedidos = Pedidos.objects.all().order_by('-fecha_pedido')
-    contexto = {
-        'active_page': 'pedidos',
-        'pedidos': pedidos,
-    }
-    return render(request, 'pasteleria_app/lista_pedidos.html', contexto)
 
-# ------------------------------------------------------------
-# Productos
-# ------------------------------------------------------------
+# ===========================
+# ALMACÉN
+# ===========================
 @login_required
-def lista_productos(request):
+def almacen(request):
     productos = Productos.objects.all()
-    contexto = {
-        'active_page': 'productos',
-        'productos': productos,
-    }
-    return render(request, 'pasteleria_app/lista_productos.html', contexto)
-
-# ------------------------------------------------------------
-# Clientes (DatosPersonales)
-# ------------------------------------------------------------
-@login_required
-def lista_clientes(request):
-    clientes = DatosPersonales.objects.all()
-    contexto = {
-        'active_page': 'clientes',
-        'clientes': clientes,
-    }
-    return render(request, 'pasteleria_app/lista_clientes.html', contexto)
-
-# ------------------------------------------------------------
-# Reportes
-# ------------------------------------------------------------
-@login_required
-def reportes(request):
-    total_ventas = Ventas.objects.annotate(
-        total_num=Cast('total', FloatField())
-    ).aggregate(
-        total=Sum('total_num')
-    )['total'] or 0
-
-    total_pedidos = Pedidos.objects.count()
-    pedidos_estados = Pedidos.objects.values('estado').annotate(total=Count('id_pedido'))
-    total_productos = Productos.objects.count()
-    total_insumos = Insumos.objects.count()
-
-    contexto = {
-        'active_page': 'reportes',
-        'total_ventas': total_ventas,
-        'total_pedidos': total_pedidos,
-        'pedidos_estados': pedidos_estados,
-        'total_productos': total_productos,
-        'total_insumos': total_insumos,
-    }
-    return render(request, 'pasteleria_app/reportes.html', contexto)
-
-# ------------------------------------------------------------
-# Configuración
-# ------------------------------------------------------------
-@login_required
-def configuracion(request):
-    contexto = {
-        'active_page': 'configuracion',
-    }
-    return render(request, 'pasteleria_app/configuracion.html', contexto)
-
-# ------------------------------------------------------------
-# Inventario
-# ------------------------------------------------------------
-@login_required
-def inventario(request):
+    insumos = Insumos.objects.all()
     inventario_items = Inventario.objects.select_related('id_producto', 'id_insumo').all()
     contexto = {
-        'active_page': 'inventario',
+        'active_page': 'almacen',
+        'productos': productos,
+        'insumos': insumos,
         'inventario_items': inventario_items,
     }
-    return render(request, 'pasteleria_app/inventario.html', contexto)
+    return render(request, 'pasteleria_app/almacen.html', contexto)
 
-# ------------------------------------------------------------
-# Insumos
-# ------------------------------------------------------------
-@login_required
-def lista_insumos(request):
-    insumos = Insumos.objects.all()
-    contexto = {
-        'active_page': 'insumos',
-        'insumos': insumos,
-    }
-    return render(request, 'pasteleria_app/lista_insumos.html', contexto)
-
-# ------------------------------------------------------------
-# Mantenimiento de equipos
-# ------------------------------------------------------------
-@login_required
-def mantenimiento_equipos(request):
-    equipos = EquiposDeRefrigeracion.objects.annotate(
-        ultimo_mantenimiento=Max('mantenimientos__fecha_mantenimiento')
-    )
-    contexto = {
-        'active_page': 'mantenimiento',
-        'equipos': equipos,
-    }
-    return render(request, 'pasteleria_app/mantenimiento_equipos.html', contexto)
-
-# Mixin para proteger vistas basadas en clase
-class RoleRequiredMixin:
-    required_roles = []
-    @method_decorator(login_required)
-    @method_decorator(role_required(required_roles))
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
-# ---------- Productos ----------
 class ProductoCreateView(RoleRequiredMixin, CreateView):
     model = Productos
     form_class = ProductoForm
     template_name = 'pasteleria_app/producto_form.html'
     success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
+    required_roles = ['admin', 'cocinero']
 
-class ProductoUpdateView(RoleRequiredMixin, UpdateView):
-    model = Productos
-    form_class = ProductoForm
-    template_name = 'pasteleria_app/producto_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-class ProductoDeleteView(RoleRequiredMixin, DeleteView):
-    model = Productos
-    template_name = 'pasteleria_app/producto_confirm_delete.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-# ---------- Insumos ----------
-class InsumoCreateView(RoleRequiredMixin, CreateView):
-    model = Insumos
-    form_class = InsumoForm
-    template_name = 'pasteleria_app/insumo_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-class InsumoUpdateView(RoleRequiredMixin, UpdateView):
-    model = Insumos
-    form_class = InsumoForm
-    template_name = 'pasteleria_app/insumo_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-class InsumoDeleteView(RoleRequiredMixin, DeleteView):
-    model = Insumos
-    template_name = 'pasteleria_app/insumo_confirm_delete.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-# ---------- Pedidos ----------
-class PedidoCreateView(RoleRequiredMixin, CreateView):
-    model = Pedidos
-    form_class = PedidoForm
-    template_name = 'pasteleria_app/pedido_form.html'
-    success_url = reverse_lazy('lista_pedidos')
-    required_roles = ['admin', 'trabajador']
-
-class PedidoUpdateView(RoleRequiredMixin, UpdateView):
-    model = Pedidos
-    form_class = PedidoForm
-    template_name = 'pasteleria_app/pedido_form.html'
-    success_url = reverse_lazy('lista_pedidos')
-    required_roles = ['admin', 'trabajador']
-
-class PedidoDeleteView(RoleRequiredMixin, DeleteView):
-    model = Pedidos
-    template_name = 'pasteleria_app/pedido_confirm_delete.html'
-    success_url = reverse_lazy('lista_pedidos')
-    required_roles = ['admin', 'trabajador']
-
-# ---------- Equipos ----------
-class EquipoCreateView(RoleRequiredMixin, CreateView):
-    model = EquiposDeRefrigeracion
-    form_class = EquipoForm
-    template_name = 'pasteleria_app/equipo_form.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-class EquipoUpdateView(RoleRequiredMixin, UpdateView):
-    model = EquiposDeRefrigeracion
-    form_class = EquipoForm
-    template_name = 'pasteleria_app/equipo_form.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-class EquipoDeleteView(RoleRequiredMixin, DeleteView):
-    model = EquiposDeRefrigeracion
-    template_name = 'pasteleria_app/equipo_confirm_delete.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-# ---------- Mantenimientos ----------
-class MantenimientoCreateView(RoleRequiredMixin, CreateView):
-    model = Mantenimientos
-    form_class = MantenimientoForm
-    template_name = 'pasteleria_app/mantenimiento_form.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-class MantenimientoUpdateView(RoleRequiredMixin, UpdateView):
-    model = Mantenimientos
-    form_class = MantenimientoForm
-    template_name = 'pasteleria_app/mantenimiento_form.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-class MantenimientoDeleteView(RoleRequiredMixin, DeleteView):
-    model = Mantenimientos
-    template_name = 'pasteleria_app/mantenimiento_confirm_delete.html'
-    success_url = reverse_lazy('mantenimiento_equipos')
-    required_roles = ['admin']
-
-# ---------- Clientes (DatosPersonales) ----------
-class ClienteCreateView(RoleRequiredMixin, CreateView):
-    model = DatosPersonales
-    form_class = DatosPersonalesForm
-    template_name = 'pasteleria_app/cliente_form.html'
-    success_url = reverse_lazy('lista_clientes')
-    required_roles = ['admin']
-
-class ClienteUpdateView(RoleRequiredMixin, UpdateView):
-    model = DatosPersonales
-    form_class = DatosPersonalesForm
-    template_name = 'pasteleria_app/cliente_form.html'
-    success_url = reverse_lazy('lista_clientes')
-    required_roles = ['admin']
-
-class ClienteDeleteView(RoleRequiredMixin, DeleteView):
-    model = DatosPersonales
-    template_name = 'pasteleria_app/cliente_confirm_delete.html'
-    success_url = reverse_lazy('lista_clientes')
-    required_roles = ['admin']
-
-# ---------- Almacen ----------
-
-@login_required
-def almacen(request):
-    productos = Productos.objects.all()
-    insumos = Insumos.objects.all()
-    inventario_items = Inventario.objects.select_related('id_producto', 'id_insumo').all()
-    contexto = {
-        'active_page': 'almacen',
-        'productos': productos,
-        'insumos': insumos,
-        'inventario_items': inventario_items,
-    }
-    return render(request, 'pasteleria_app/almacen.html', contexto)
-
-class InventarioCreateView(RoleRequiredMixin, CreateView):
-    model = Inventario
-    form_class = InventarioForm
-    template_name = 'pasteleria_app/inventario_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-class InventarioUpdateView(RoleRequiredMixin, UpdateView):
-    model = Inventario
-    form_class = InventarioForm
-    template_name = 'pasteleria_app/inventario_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-class InventarioDeleteView(RoleRequiredMixin, DeleteView):
-    model = Inventario
-    template_name = 'pasteleria_app/inventario_confirm_delete.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'trabajador']
-
-@login_required
-@role_required(['admin'])
-def lista_usuarios(request):
-    usuarios = Usuarios.objects.all().select_related('datos_personales')
-    contexto = {
-        'active_page': 'usuarios',
-        'usuarios': usuarios,
-    }
-    return render(request, 'pasteleria_app/lista_usuarios.html', contexto)
-
-@login_required
-@role_required(['admin'])
-def crear_usuario(request):
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            # Bloqueo extra por si intentan forzar admin por POST
-            if user.rol == 'admin':
-                messages.error(request, "No se puede crear un usuario con rol de administrador.")
-                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-            password = form.cleaned_data.get('password')
-            if not password:
-                messages.error(request, "Debe ingresar una contraseña para el nuevo usuario.")
-                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-            user.set_password(password)
-            user.is_active = True   # Siempre activo por defecto
-            user.is_staff = False
-            user.save()
-
-            DatosPersonales.objects.create(
-                id_usuario=user.id_usuario,
-                nombres=form.cleaned_data['nombres'],
-                apellidos=form.cleaned_data['apellidos'],
-                telefono=form.cleaned_data['telefono'],
-                direccion=form.cleaned_data['direccion']
-            )
-            messages.success(request, "Usuario creado correctamente.")
-            return redirect('lista_usuarios')
-    else:
-        form = UsuarioForm()
-    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-@login_required
-@role_required(['admin'])
-def editar_usuario(request, pk):
-    user = get_object_or_404(Usuarios, pk=pk)
-    datos = getattr(user, 'datos_personales', None)
-    initial = {}
-    if datos:
-        initial = {
-            'nombres': datos.nombres,
-            'apellidos': datos.apellidos,
-            'telefono': datos.telefono,
-            'direccion': datos.direccion,
-        }
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST, instance=user, initial=initial)
-        if form.is_valid():
-            user = form.save(commit=False)
-            password = form.cleaned_data.get('password')
-            if password:
-                user.set_password(password)
-            user.save()
-
-            DatosPersonales.objects.update_or_create(
-                id_usuario=user.id_usuario,
-                defaults={
-                    'nombres': form.cleaned_data['nombres'],
-                    'apellidos': form.cleaned_data['apellidos'],
-                    'telefono': form.cleaned_data['telefono'],
-                    'direccion': form.cleaned_data['direccion'],
-                }
-            )
-            messages.success(request, "Usuario actualizado.")
-            return redirect('lista_usuarios')
-    else:
-        form = UsuarioForm(instance=user, initial=initial)
-    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-@login_required
-@role_required(['admin'])
-def toggle_usuario_activo(request, pk):
-    user = get_object_or_404(Usuarios, pk=pk)
-    # No permitir desactivar al último administrador
-    if user.rol == 'admin':
-        messages.error(request, "No se puede desactivar al administrador.")
-        return redirect('lista_usuarios')
-
-    user.is_active = not user.is_active
-    user.save()
-    estado = "activado" if user.is_active else "desactivado"
-    messages.success(request, f"Usuario {user.usuario} {estado} correctamente.")
-    registrar_log(request.user, f'Cambio estado usuario', f'{user.usuario} -> {estado}')
-    return redirect('lista_usuarios')
-
-@login_required
-@role_required(['admin'])
-def eliminar_usuario(request, pk):
-    user = get_object_or_404(Usuarios, pk=pk)
-    if request.method == 'POST':
-        user.delete()
-        messages.success(request, 'Usuario eliminado.')
-        return redirect('lista_usuarios')
-    return render(request, 'pasteleria_app/usuario_confirm_delete.html', {'object': user, 'active_page': 'usuarios'})
-
-# --- Vista de fabricación de producto (descuenta insumos) ---
-@login_required
-@role_required(['admin', 'cocinero'])
-def producir_producto(request, producto_id):
-    producto = get_object_or_404(Productos, pk=producto_id)
-    insumos_necesarios = ProductoInsumos.objects.filter(id_producto=producto)
-    errores = []
-    exito = True
-
-    for item in insumos_necesarios:
-        insumo = item.id_insumo
-        cantidad_necesaria = item.cantidad
-        if insumo.cantidad < cantidad_necesaria:
-            errores.append(f"Stock insuficiente de {insumo.nombre_insumo}: necesita {cantidad_necesaria}, hay {insumo.cantidad}.")
-            exito = False
-
-    if exito:
-        for item in insumos_necesarios:
-            insumo = item.id_insumo
-            insumo.cantidad -= item.cantidad
-            insumo.save()
-        messages.success(request, f"Producto '{producto.nombre}' fabricado. Insumos descontados.")
-        registrar_log(request.user, 'Fabricación', f'Producto: {producto.nombre}')
-    else:
-        messages.error(request, "Errores: " + "; ".join(errores))
-
-    return redirect('almacen')
-
-def menu_publico(request):
-    productos = Productos.objects.all()   # Sin filtrar por 'disponible'
-    return render(request, 'pasteleria_app/menu_publico.html', {'productos': productos})
-
-@login_required
-def almacen(request):
-    productos = Productos.objects.all()
-    insumos = Insumos.objects.all()
-    inventario_items = Inventario.objects.select_related('id_producto', 'id_insumo').all()
-    contexto = {
-        'active_page': 'almacen',
-        'productos': productos,
-        'insumos': insumos,
-        'inventario_items': inventario_items,
-    }
-    return render(request, 'pasteleria_app/almacen.html', contexto)
-
-@login_required
-@role_required(['admin'])
-def lista_usuarios(request):
-    usuarios = Usuarios.objects.all().select_related('datos_personales')
-    contexto = {
-        'active_page': 'usuarios',
-        'usuarios': usuarios,
-    }
-    return render(request, 'pasteleria_app/lista_usuarios.html', contexto)
-
-@login_required
-@role_required(['admin'])
-def crear_usuario(request):
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            # Bloqueo extra de admin
-            if user.rol == 'admin':
-                messages.error(request, "No se puede crear un usuario con rol de administrador.")
-                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-            password = form.cleaned_data.get('password')
-            if not password:
-                messages.error(request, "Debe ingresar una contraseña para el nuevo usuario.")
-                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-            user.set_password(password)   # ← Esto genera el hash en user.password
-            user.is_active = True
-            user.is_staff = False
-            user.save()
-
-            DatosPersonales.objects.create(
-                id_usuario=user.id_usuario,
-                nombres=form.cleaned_data['nombres'],
-                apellidos=form.cleaned_data['apellidos'],
-                telefono=form.cleaned_data['telefono'],
-                direccion=form.cleaned_data['direccion']
-            )
-            messages.success(request, "Usuario creado correctamente.")
-            return redirect('lista_usuarios')
-    else:
-        form = UsuarioForm()
-    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
-
-@login_required
-@role_required(['admin'])
-def editar_usuario(request, pk):
-    user = get_object_or_404(Usuarios, pk=pk)
-    datos = getattr(user, 'datos_personales', None)
-    initial = {}
-    if datos:
-        initial = {
-            'nombres': datos.nombres,
-            'apellidos': datos.apellidos,
-            'telefono': datos.telefono,
-            'direccion': datos.direccion,
-        }
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST, instance=user, initial=initial)
-        if form.is_valid():
-            user = form.save()
-            # Actualizar DatosPersonales
-            datos, created = DatosPersonales.objects.update_or_create(
-                id_usuario=user.id_usuario,
-                defaults={
-                    'nombres': form.cleaned_data.get('nombres', ''),
-                    'apellidos': form.cleaned_data.get('apellidos', ''),
-                    'telefono': form.cleaned_data.get('telefono', ''),
-                    'direccion': form.cleaned_data.get('direccion', ''),
-                }
-            )
-            user.datos_personales = datos
-            user.save()
-            messages.success(request, 'Usuario actualizado correctamente.')
-            return redirect('lista_usuarios')
-    else:
-        form = UsuarioForm(instance=user, initial=initial)
-    return render(request, 'pasteleria_app/usuario_form.html', {
-        'form': form,
-        'active_page': 'usuarios',
-        'titulo': 'Editar Usuario'
-    })
-
-@login_required
-@role_required(['admin'])
-def eliminar_usuario(request, pk):
-    user = get_object_or_404(Usuarios, pk=pk)
-    if request.method == 'POST':
-        user.delete()
-        messages.success(request, 'Usuario eliminado.')
-        return redirect('lista_usuarios')
-    return render(request, 'pasteleria_app/usuario_confirm_delete.html', {
-        'object': user,
-        'active_page': 'usuarios'
-    })
-
-@login_required
-@role_required(['admin', 'cajero'])
-def abrir_caja(request):
-    # Verificar si ya hay una caja abierta
-    if Caja.objects.filter(estado='abierta').exists():
-        messages.error(request, "Ya existe una caja abierta. Debe cerrarla antes de abrir otra.")
-        return redirect('dashboard')
-
-    if request.method == 'POST':
-        monto_inicial = request.POST.get('monto_inicial', 0)
-        caja = Caja.objects.create(
-            usuario_apertura=request.user,
-            monto_inicial=monto_inicial
-        )
-        messages.success(request, "Caja abierta correctamente.")
-        registrar_log(request.user, 'Apertura de caja', f'Monto inicial: {monto_inicial}')
-        return redirect('dashboard')
-
-    return render(request, 'pasteleria_app/abrir_caja.html', {'active_page': 'caja'})
-    
-
-@login_required
-@role_required(['admin', 'cajero'])
-def cerrar_caja(request):
-    caja_abierta = Caja.objects.filter(estado='abierta').first()
-    if not caja_abierta:
-        messages.error(request, "No hay ninguna caja abierta.")
-        return redirect('dashboard')
-
-    if request.method == 'POST':
-        monto_final = request.POST.get('monto_final')
-        caja_abierta.monto_final = monto_final
-        caja_abierta.fecha_cierre = timezone.now()
-        caja_abierta.estado = 'cerrada'
-        caja_abierta.save()
-        messages.success(request, "Caja cerrada correctamente.")
-        registrar_log(request.user, 'Cierre de caja', f'Monto final: {monto_final}')
-        return redirect('dashboard')
-
-    return render(request, 'pasteleria_app/cerrar_caja.html', {'caja': caja_abierta, 'active_page': 'caja'})
-
-@login_required
-@role_required(['admin'])
-def ver_logs(request):
-    logs = Log.objects.all()[:100]  # últimos 100 registros
-    return render(request, 'pasteleria_app/logs.html', {'logs': logs, 'active_page': 'logs'})
-
-@login_required
-@require_GET
-def calcular_insumos_api(request):
-    producto_id = request.GET.get('producto_id')
-    cantidad = request.GET.get('cantidad', 1)
-    try:
-        cantidad = int(cantidad)
-    except ValueError:
-        return JsonResponse({'error': 'Cantidad no válida'}, status=400)
-
-    producto = get_object_or_404(Productos, pk=producto_id)
-    insumos = ProductoInsumos.objects.filter(id_producto=producto).select_related('id_insumo')
-    data = []
-    for item in insumos:
-        insumo = item.id_insumo
-        total_necesario = item.cantidad * cantidad
-        data.append({
-            'insumo': insumo.nombre_insumo,
-            'unidad': insumo.unidad,
-            'cantidad_por_unidad': item.cantidad,
-            'total_necesario': total_necesario,
-            'stock_actual': insumo.cantidad,
-            'suficiente': insumo.cantidad >= total_necesario,
-        })
-    return JsonResponse({'producto': producto.nombre, 'insumos': data})
-
-@login_required
-@role_required(['admin', 'cocinero', 'cajero'])
-def calcular_insumos(request):
-    productos = Productos.objects.all()
-    return render(request, 'pasteleria_app/calcular_insumos.html', {
-        'productos': productos,
-        'active_page': 'calcular_insumos'
-    })
-
-
-class RoleRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
-    required_roles = []  # Se define en cada vista
-
-    def test_func(self):
-        return self.request.user.rol in self.required_roles
-
-    def handle_no_permission(self):
-        if self.request.user.is_authenticated:
-            # Si está autenticado pero no tiene el rol adecuado, error 403
-            raise PermissionDenied("No tienes permiso para acceder a esta página.")
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['insumos_formset'] = ProductoInsumoFormSet(self.request.POST)
         else:
-            # Si no está autenticado, redirige al login
-            return super().handle_no_permission()
+            context['insumos_formset'] = ProductoInsumoFormSet()
+        return context
 
-# ---------- Productos ----------
-class ProductoCreateView(RoleRequiredMixin, CreateView):
-    model = Productos
-    form_class = ProductoForm
-    template_name = 'pasteleria_app/producto_form.html'
-    success_url = reverse_lazy('almacen')
-    required_roles = ['admin', 'cocinero']
+    def form_valid(self, form):
+        context = self.get_context_data()
+        insumos_formset = context['insumos_formset']
+        if insumos_formset.is_valid():
+            self.object = form.save()
+            insumos_formset.instance = self.object
+            insumos_formset.save()
+            return redirect(self.success_url)
+        else:
+            return self.render_to_response(self.get_context_data(form=form))
 
 class ProductoUpdateView(RoleRequiredMixin, UpdateView):
     model = Productos
@@ -816,13 +198,31 @@ class ProductoUpdateView(RoleRequiredMixin, UpdateView):
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'cocinero']
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['insumos_formset'] = ProductoInsumoFormSet(self.request.POST, instance=self.object)
+        else:
+            context['insumos_formset'] = ProductoInsumoFormSet(instance=self.object)
+        return context
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        insumos_formset = context['insumos_formset']
+        if insumos_formset.is_valid():
+            self.object = form.save()
+            insumos_formset.instance = self.object
+            insumos_formset.save()
+            return redirect(self.success_url)
+        else:
+            return self.render_to_response(self.get_context_data(form=form))
+
 class ProductoDeleteView(RoleRequiredMixin, DeleteView):
     model = Productos
     template_name = 'pasteleria_app/producto_confirm_delete.html'
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'cocinero']
 
-# ---------- Insumos ----------
 class InsumoCreateView(RoleRequiredMixin, CreateView):
     model = Insumos
     form_class = InsumoForm
@@ -843,7 +243,6 @@ class InsumoDeleteView(RoleRequiredMixin, DeleteView):
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'cocinero']
 
-# ---------- Inventario ----------
 class InventarioCreateView(RoleRequiredMixin, CreateView):
     model = Inventario
     form_class = InventarioForm
@@ -864,16 +263,14 @@ class InventarioDeleteView(RoleRequiredMixin, DeleteView):
     success_url = reverse_lazy('almacen')
     required_roles = ['admin', 'cocinero']
 
-
+# ===========================
+# LOTES
+# ===========================
 @login_required
 @role_required(['admin', 'cocinero'])
 def lista_lotes(request):
     lotes = LoteInsumo.objects.select_related('id_insumo').order_by('fecha_caducidad')
-    contexto = {
-        'active_page': 'lotes',
-        'lotes': lotes,
-    }
-    return render(request, 'pasteleria_app/lista_lotes.html', contexto)
+    return render(request, 'pasteleria_app/lista_lotes.html', {'active_page': 'lotes', 'lotes': lotes})
 
 @login_required
 @role_required(['admin', 'cocinero'])
@@ -901,15 +298,14 @@ def eliminar_lote(request, pk):
         return redirect('lista_lotes')
     return render(request, 'pasteleria_app/lote_confirm_delete.html', {'object': lote, 'active_page': 'lotes'})
 
+# ===========================
+# FABRICACIÓN
+# ===========================
 @login_required
 @role_required(['admin', 'cocinero'])
 def lista_fabricacion(request):
     fabricaciones = ProductoAlmacen.objects.select_related('id_producto').order_by('-fecha_ingreso')
-    contexto = {
-        'active_page': 'fabricacion',
-        'fabricaciones': fabricaciones,
-    }
-    return render(request, 'pasteleria_app/lista_fabricacion.html', contexto)
+    return render(request, 'pasteleria_app/lista_fabricacion.html', {'active_page': 'fabricacion', 'fabricaciones': fabricaciones})
 
 @login_required
 @role_required(['admin', 'cocinero'])
@@ -937,16 +333,14 @@ def eliminar_fabricacion(request, pk):
         return redirect('lista_fabricacion')
     return render(request, 'pasteleria_app/fabricacion_confirm_delete.html', {'object': fabricacion, 'active_page': 'fabricacion'})
 
-
+# ===========================
+# MOSTRADOR
+# ===========================
 @login_required
 @role_required(['admin', 'cocinero', 'cajero'])
 def lista_mostrador(request):
     mostrador = ProductoMostrador.objects.select_related('id_producto').order_by('-fecha')
-    contexto = {
-        'active_page': 'mostrador',
-        'mostrador': mostrador,
-    }
-    return render(request, 'pasteleria_app/lista_mostrador.html', contexto)
+    return render(request, 'pasteleria_app/lista_mostrador.html', {'active_page': 'mostrador', 'mostrador': mostrador})
 
 @login_required
 @role_required(['admin', 'cocinero', 'cajero'])
@@ -954,9 +348,20 @@ def agregar_mostrador(request):
     if request.method == 'POST':
         form = MostradorForm(request.POST)
         if form.is_valid():
+            producto = form.cleaned_data['id_producto']
+            cantidad_a_mover = form.cleaned_data['cantidad']
+            stock_almacen = ProductoAlmacen.objects.filter(id_producto=producto).aggregate(total=Sum('cantidad'))['total'] or 0
+
+            if cantidad_a_mover > stock_almacen:
+                messages.error(
+                    request,
+                    f"No hay suficiente stock en el almacén. Disponible: {stock_almacen}, solicitado: {cantidad_a_mover}."
+                )
+                return redirect('agregar_mostrador')
+
             item = form.save()
             messages.success(request, f"Producto '{item.id_producto.nombre}' agregado al mostrador.")
-            registrar_log(request.user, 'Mostrador', f"{item.id_producto.nombre} x{item.cantidad} en mostrador")
+            registrar_log(request.user, 'Mostrador', f"{item.id_producto.nombre} x{item.cantidad}")
             return redirect('lista_mostrador')
     else:
         form = MostradorForm()
@@ -974,111 +379,160 @@ def eliminar_mostrador(request, pk):
         return redirect('lista_mostrador')
     return render(request, 'pasteleria_app/mostrador_confirm_delete.html', {'object': item, 'active_page': 'mostrador'})
 
+# ===========================
+# PEDIDOS
+# ===========================
 @login_required
-@role_required(['cajero'])   # Solo cajero, admin no debería abrir caja
-def abrir_caja(request):
-    # Cerrar cajas vencidas
-    config = ConfiguracionCaja.objects.first()
-    if config:
-        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
-        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
-            estado='cerrada',
-            fecha_cierre=timezone.now()
-        )
+@role_required(['admin', 'cajero', 'cocinero'])
+def lista_pedidos(request):
+    pedidos = Pedidos.objects.all().order_by('-fecha_pedido')
+    return render(request, 'pasteleria_app/lista_pedidos.html', {'active_page': 'pedidos', 'pedidos': pedidos})
 
-    cajas_abiertas = Caja.objects.filter(estado='abierta').count()
-    max_permitido = config.max_cajas_activas if config else 1
+class PedidoCreateView(RoleRequiredMixin, CreateView):
+    model = Pedidos
+    form_class = PedidoForm
+    template_name = 'pasteleria_app/pedido_form.html'
+    success_url = reverse_lazy('lista_pedidos')
+    required_roles = ['admin', 'cocinero']
 
-    if cajas_abiertas >= max_permitido:
-        messages.error(request, f"Ya hay {cajas_abiertas} cajas abiertas. El máximo permitido es {max_permitido}.")
-        return redirect('dashboard')  # o a una vista de caja
+class PedidoUpdateView(RoleRequiredMixin, UpdateView):
+    model = Pedidos
+    form_class = PedidoForm
+    template_name = 'pasteleria_app/pedido_form.html'
+    success_url = reverse_lazy('lista_pedidos')
+    required_roles = ['admin', 'cocinero']
 
-    if request.method == 'POST':
-        monto_inicial = request.POST.get('monto_inicial', 0)
-        Caja.objects.create(
-            id_usuario=request.user,
-            monto_inicial=monto_inicial
-        )
-        messages.success(request, "Caja abierta correctamente.")
-        return redirect('dashboard')
-    return render(request, 'pasteleria_app/abrir_caja.html', {'active_page': 'caja'})
+class PedidoDeleteView(RoleRequiredMixin, DeleteView):
+    model = Pedidos
+    template_name = 'pasteleria_app/pedido_confirm_delete.html'
+    success_url = reverse_lazy('lista_pedidos')
+    required_roles = ['admin', 'cocinero']
 
+# ===========================
+# USUARIOS
+# ===========================
 @login_required
-@role_required(['cajero'])
-def cerrar_caja(request):
-    caja_abierta = Caja.objects.filter(estado='abierta', id_usuario=request.user).order_by('-fecha_apertura').first()
-    if not caja_abierta:
-        messages.error(request, "No tienes ninguna caja abierta.")
-        return redirect('dashboard')
-
-    # Verificar tiempo excedido automáticamente
-    config = ConfiguracionCaja.objects.first()
-    if config:
-        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
-        if caja_abierta.fecha_apertura < limite:
-            caja_abierta.estado = 'cerrada'
-            caja_abierta.fecha_cierre = timezone.now()
-            caja_abierta.save()
-            messages.info(request, "La caja fue cerrada automáticamente por exceder el tiempo máximo.")
-            return redirect('dashboard')
-
-    if request.method == 'POST':
-        monto_final = request.POST.get('monto_final')
-        caja_abierta.monto_final = monto_final
-        caja_abierta.fecha_cierre = timezone.now()
-        caja_abierta.estado = 'cerrada'
-        caja_abierta.save()
-        messages.success(request, "Caja cerrada correctamente.")
-        return redirect('dashboard')
-
-    return render(request, 'pasteleria_app/cerrar_caja.html', {'caja': caja_abierta, 'active_page': 'caja'})
-
+@role_required(['admin'])
+def lista_usuarios(request):
+    usuarios = Usuarios.objects.exclude(rol='admin').select_related('datos_personales')
+    return render(request, 'pasteleria_app/lista_usuarios.html', {'active_page': 'usuarios', 'usuarios': usuarios})
 
 @login_required
 @role_required(['admin'])
-def gestionar_cajas(request):
-    config, _ = ConfiguracionCaja.objects.get_or_create(pk=1)
+def crear_usuario(request):
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            if user.rol == 'admin':
+                messages.error(request, "No se puede crear un usuario con rol de administrador.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            password = form.cleaned_data.get('password')
+            if not password:
+                messages.error(request, "Debe ingresar una contraseña para el nuevo usuario.")
+                return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+            user.set_password(password)
+            user.is_active = True
+            user.is_staff = False
+            user.save()
+
+            DatosPersonales.objects.create(
+                id_usuario=user.id_usuario,
+                nombres=form.cleaned_data.get('nombres', ''),
+                apellidos=form.cleaned_data.get('apellidos', ''),
+                telefono=form.cleaned_data.get('telefono'),
+                direccion=form.cleaned_data.get('direccion', '')
+            )
+            messages.success(request, "Usuario creado correctamente.")
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm()
+    return render(request, 'pasteleria_app/usuario_form.html', {'form': form, 'active_page': 'usuarios'})
+
+@login_required
+@role_required(['admin'])
+def editar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    if user.rol == 'admin':
+        messages.error(request, "No se puede editar al administrador.")
+        return redirect('lista_usuarios')
+
+    datos = getattr(user, 'datos_personales', None)
+    initial = {}
+    if datos:
+        initial = {
+            'nombres': datos.nombres,
+            'apellidos': datos.apellidos,
+            'telefono': datos.telefono,
+            'direccion': datos.direccion,
+        }
 
     if request.method == 'POST':
-        # Si es para cerrar una caja específica
-        if 'cerrar_caja_id' in request.POST:
-            caja_id = request.POST.get('cerrar_caja_id')
-            caja = get_object_or_404(Caja, pk=caja_id)
-            caja.estado = 'cerrada'
-            caja.fecha_cierre = timezone.now()
-            caja.save()
-            messages.success(request, f"Caja {caja.id_caja} cerrada manualmente.")
-            registrar_log(request.user, 'Cierre manual de caja', f"Caja {caja.id_caja}")
-            return redirect('gestionar_cajas')
+        form = UsuarioForm(request.POST, instance=user, initial=initial)
+        if form.is_valid():
+            user = form.save(commit=False)
+            password = form.cleaned_data.get('password')
+            if password:
+                user.set_password(password)
+            user.save()
 
-        # Si es para guardar configuración
-        config.max_cajas_activas = request.POST.get('max_cajas_activas')
-        config.tiempo_maximo_minutos = request.POST.get('tiempo_maximo_minutos')
-        config.save()
-        messages.success(request, "Configuración de cajas actualizada.")
-        return redirect('gestionar_cajas')
+            # Actualizar o crear DatosPersonales
+            datos, created = DatosPersonales.objects.update_or_create(
+                id_usuario=user.id_usuario,
+                defaults={
+                    'nombres': form.cleaned_data.get('nombres', ''),
+                    'apellidos': form.cleaned_data.get('apellidos', ''),
+                    'telefono': form.cleaned_data.get('telefono'),
+                    'direccion': form.cleaned_data.get('direccion', ''),
+                }
+            )
+            # Asignar la relación OneToOne
+            user.datos_personales = datos
+            user.save()
 
-    # Cerrar automáticamente cajas vencidas
-    if config.tiempo_maximo_minutos:
-        limite = timezone.now() - timezone.timedelta(minutes=config.tiempo_maximo_minutos)
-        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
-            estado='cerrada',
-            fecha_cierre=timezone.now()
-        )
+            messages.success(request, "Usuario actualizado correctamente.")
+            return redirect('lista_usuarios')
+    else:
+        form = UsuarioForm(instance=user, initial=initial)
 
-    cajas_activas = Caja.objects.filter(estado='abierta')
-    todas_cajas = Caja.objects.all().order_by('-fecha_apertura')
+    return render(request, 'pasteleria_app/usuario_form.html', {
+        'form': form,
+        'active_page': 'usuarios'
+    })
 
-    contexto = {
-        'active_page': 'gestion_cajas',
-        'config': config,
-        'cajas': todas_cajas,
-        'cajas_activas': cajas_activas,
-        'num_cajas_activas': cajas_activas.count(),
-    }
-    return render(request, 'pasteleria_app/gestionar_cajas.html', contexto)
+@login_required
+@role_required(['admin'])
+def toggle_usuario_activo(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    if user.rol == 'admin':
+        messages.error(request, "No se puede desactivar al administrador.")
+        return redirect('lista_usuarios')
 
-# ========== Equipos ==========
+    user.is_active = not user.is_active
+    user.save()
+    estado = "activado" if user.is_active else "desactivado"
+    messages.success(request, f"Usuario {user.usuario} {estado} correctamente.")
+    registrar_log(request.user, 'Cambio estado usuario', f'{user.usuario} -> {estado}')
+    return redirect('lista_usuarios')
+
+@login_required
+@role_required(['admin'])
+def eliminar_usuario(request, pk):
+    user = get_object_or_404(Usuarios, pk=pk)
+    if user.rol == 'admin':
+        messages.error(request, "No se puede eliminar al administrador.")
+        return redirect('lista_usuarios')
+    if request.method == 'POST':
+        user.delete()
+        messages.success(request, "Usuario eliminado.")
+        return redirect('lista_usuarios')
+    return render(request, 'pasteleria_app/usuario_confirm_delete.html', {'object': user, 'active_page': 'usuarios'})
+
+# ===========================
+# EQUIPOS
+# ===========================
 class EquipoListView(RoleRequiredMixin, ListView):
     model = EquiposDeRefrigeracion
     template_name = 'pasteleria_app/lista_equipos.html'
@@ -1105,7 +559,9 @@ class EquipoDeleteView(RoleRequiredMixin, DeleteView):
     success_url = reverse_lazy('lista_equipos')
     required_roles = ['admin']
 
-# ========== Mantenimientos ==========
+# ===========================
+# MANTENIMIENTOS
+# ===========================
 class MantenimientoListView(RoleRequiredMixin, ListView):
     model = Mantenimientos
     template_name = 'pasteleria_app/lista_mantenimientos.html'
@@ -1131,3 +587,192 @@ class MantenimientoDeleteView(RoleRequiredMixin, DeleteView):
     template_name = 'pasteleria_app/mantenimiento_confirm_delete.html'
     success_url = reverse_lazy('lista_mantenimientos')
     required_roles = ['admin']
+
+# ===========================
+# CAJA
+# ===========================
+@login_required
+@role_required(['cajero'])
+def abrir_caja(request):
+    config = ConfiguracionCaja.objects.first()
+    if config:
+        limite = timezone.now() - timedelta(minutes=config.tiempo_maximo_minutos)
+        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
+            estado='cerrada',
+            fecha_cierre=timezone.now()
+        )
+
+    cajas_abiertas = Caja.objects.filter(estado='abierta').count()
+    max_permitido = config.max_cajas_activas if config else 1
+
+    if cajas_abiertas >= max_permitido:
+        messages.error(request, f"Ya hay {cajas_abiertas} cajas abiertas. El máximo permitido es {max_permitido}.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        monto_inicial = request.POST.get('monto_inicial', 0)
+        Caja.objects.create(
+            id_usuario=request.user,
+            monto_inicial=monto_inicial
+        )
+        messages.success(request, "Caja abierta correctamente.")
+        registrar_log(request.user, 'Apertura de caja', f'Monto inicial: {monto_inicial}')
+        return redirect('dashboard')
+
+    return render(request, 'pasteleria_app/abrir_caja.html', {'active_page': 'caja'})
+
+@login_required
+@role_required(['cajero'])
+def cerrar_caja(request):
+    caja_abierta = Caja.objects.filter(estado='abierta', id_usuario=request.user).order_by('-fecha_apertura').first()
+    if not caja_abierta:
+        messages.error(request, "No tienes ninguna caja abierta.")
+        return redirect('dashboard')
+
+    config = ConfiguracionCaja.objects.first()
+    if config:
+        limite = timezone.now() - timedelta(minutes=config.tiempo_maximo_minutos)
+        if caja_abierta.fecha_apertura < limite:
+            caja_abierta.estado = 'cerrada'
+            caja_abierta.fecha_cierre = timezone.now()
+            caja_abierta.save()
+            messages.info(request, "La caja fue cerrada automáticamente por exceder el tiempo máximo.")
+            return redirect('dashboard')
+
+    if request.method == 'POST':
+        monto_final = request.POST.get('monto_final')
+        caja_abierta.monto_final = monto_final
+        caja_abierta.fecha_cierre = timezone.now()
+        caja_abierta.estado = 'cerrada'
+        caja_abierta.save()
+        messages.success(request, "Caja cerrada correctamente.")
+        registrar_log(request.user, 'Cierre de caja', f'Monto final: {monto_final}')
+        return redirect('dashboard')
+
+    return render(request, 'pasteleria_app/cerrar_caja.html', {'caja': caja_abierta, 'active_page': 'caja'})
+
+@login_required
+@role_required(['admin'])
+def gestionar_cajas(request):
+    config, _ = ConfiguracionCaja.objects.get_or_create(pk=1)
+
+    if request.method == 'POST':
+        if 'cerrar_caja_id' in request.POST:
+            caja_id = request.POST.get('cerrar_caja_id')
+            caja = get_object_or_404(Caja, pk=caja_id)
+            caja.estado = 'cerrada'
+            caja.fecha_cierre = timezone.now()
+            caja.save()
+            messages.success(request, f"Caja {caja.id_caja} cerrada manualmente.")
+            registrar_log(request.user, 'Cierre manual de caja', f"Caja {caja.id_caja}")
+            return redirect('gestionar_cajas')
+
+        config.max_cajas_activas = request.POST.get('max_cajas_activas')
+        config.tiempo_maximo_minutos = request.POST.get('tiempo_maximo_minutos')
+        config.save()
+        messages.success(request, "Configuración de cajas actualizada.")
+        return redirect('gestionar_cajas')
+
+    if config.tiempo_maximo_minutos:
+        limite = timezone.now() - timedelta(minutes=config.tiempo_maximo_minutos)
+        Caja.objects.filter(estado='abierta', fecha_apertura__lt=limite).update(
+            estado='cerrada',
+            fecha_cierre=timezone.now()
+        )
+
+    cajas_activas = Caja.objects.filter(estado='abierta')
+    todas_cajas = Caja.objects.all().order_by('-fecha_apertura')
+
+    contexto = {
+        'active_page': 'gestion_cajas',
+        'config': config,
+        'cajas': todas_cajas,
+        'cajas_activas': cajas_activas,
+        'num_cajas_activas': cajas_activas.count(),
+    }
+    return render(request, 'pasteleria_app/gestionar_cajas.html', contexto)
+
+# ===========================
+# LOGS
+# ===========================
+@login_required
+@role_required(['admin'])
+def ver_logs(request):
+    logs = Log.objects.all()[:100]
+    return render(request, 'pasteleria_app/logs.html', {'logs': logs, 'active_page': 'logs'})
+
+# ===========================
+# CÁLCULO DE INSUMOS
+# ===========================
+@login_required
+@role_required(['admin', 'cocinero', 'cajero'])
+def calcular_insumos(request):
+    productos = Productos.objects.all()
+    return render(request, 'pasteleria_app/calcular_insumos.html', {
+        'productos': productos,
+        'active_page': 'calcular_insumos'
+    })
+
+@login_required
+@require_GET
+def calcular_insumos_api(request):
+    producto_id = request.GET.get('producto_id')
+    cantidad = request.GET.get('cantidad', 1)
+    try:
+        cantidad = int(cantidad)
+    except ValueError:
+        return JsonResponse({'error': 'Cantidad no válida'}, status=400)
+
+    producto = get_object_or_404(Productos, pk=producto_id)
+    insumos = ProductoInsumos.objects.filter(id_producto=producto).select_related('id_insumo')
+    data = []
+    for item in insumos:
+        insumo = item.id_insumo
+        total_necesario = item.cantidad * cantidad
+        data.append({
+            'insumo': insumo.nombre_insumo,
+            'unidad': insumo.unidad,
+            'cantidad_por_unidad': item.cantidad,
+            'total_necesario': total_necesario,
+            'stock_actual': insumo.cantidad,
+            'suficiente': insumo.cantidad >= total_necesario,
+        })
+    return JsonResponse({'producto': producto.nombre, 'insumos': data})
+
+def menu_publico(request):
+    productos = Productos.objects.all()
+    return render(request, 'pasteleria_app/menu_publico.html', {'productos': productos})
+
+# ===========================
+# REPORTES
+# ===========================
+@login_required
+def reportes(request):
+    total_ventas = Ventas.objects.annotate(
+        total_num=Cast('total', FloatField())
+    ).aggregate(total=Sum('total_num'))['total'] or 0
+
+    total_pedidos = Pedidos.objects.count()
+    pedidos_estados = Pedidos.objects.values('estado').annotate(total=Count('id_pedido'))
+    total_productos = Productos.objects.count()
+    total_insumos = Insumos.objects.count()
+
+    contexto = {
+        'active_page': 'reportes',
+        'total_ventas': total_ventas,
+        'total_pedidos': total_pedidos,
+        'pedidos_estados': pedidos_estados,
+        'total_productos': total_productos,
+        'total_insumos': total_insumos,
+    }
+    return render(request, 'pasteleria_app/reportes.html', contexto)
+
+# ===========================
+# CONFIGURACIÓN
+# ===========================
+@login_required
+def configuracion(request):
+    contexto = {
+        'active_page': 'configuracion',
+    }
+    return render(request, 'pasteleria_app/configuracion.html', contexto)

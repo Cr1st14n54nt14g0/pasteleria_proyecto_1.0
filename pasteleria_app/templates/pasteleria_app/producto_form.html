@@ -3,18 +3,19 @@
 {% block content %}
 <div class="container-fluid">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
+        <div class="col-md-10">
+            <div class="card shadow-sm border-0">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-birthday-cake"></i>
+                        <i class="fas fa-birthday-cake me-2"></i>
                         {% if form.instance.pk %}Editar Producto{% else %}Nuevo Producto{% endif %}
                     </h5>
                 </div>
                 <div class="card-body">
                     <form method="post" novalidate>
                         {% csrf_token %}
-                        
+
+                        <!-- Campos del producto -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="id_nombre" class="form-label">Nombre del producto <span class="text-danger">*</span></label>
@@ -48,12 +49,42 @@
                             {% endfor %}
                         </div>
 
-                        <div class="d-flex justify-content-end gap-2 mt-3">
-                            <a href="{% url 'almacen' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Cancelar
+                        <hr>
+                        <h5 class="text-muted"><i class="fas fa-list me-2"></i>Ingredientes (Receta)</h5>
+                        <p class="small text-muted">Agregue los insumos necesarios para una unidad de este producto.</p>
+
+                        {{ insumos_formset.management_form }}
+                        <table class="table table-bordered table-hover" id="insumos-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th>Cantidad</th>
+                                    <th>¿Eliminar?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for form in insumos_formset %}
+                                <tr class="insumo-row">
+                                    <td>{{ form.id_insumo }}</td>
+                                    <td>{{ form.cantidad }}</td>
+                                    <td class="text-center">{{ form.DELETE }}</td>
+                                    {{ form.id }}
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3">No hay insumos agregados.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="add-insumo">
+                            <i class="fas fa-plus me-1"></i> Agregar insumo
+                        </button>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'almacen' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Cancelar
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Guardar Producto
+                                <i class="fas fa-save me-1"></i> Guardar Producto
                             </button>
                         </div>
                     </form>
@@ -62,4 +93,58 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tbody = document.querySelector('#insumos-table tbody');
+    const addButton = document.getElementById('add-insumo');
+
+    if (!tbody || !addButton) return;
+
+    // Buscar el campo TOTAL_FORMS de cualquier formset en la página
+    const totalFormsInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+
+    addButton.addEventListener('click', function() {
+        // Tomar la última fila como plantilla (puede ser la vacía o una ya llenada)
+        const rows = tbody.querySelectorAll('.insumo-row');
+        if (rows.length === 0) return;
+
+        const templateRow = rows[rows.length - 1]; // última fila
+        const newRow = templateRow.cloneNode(true);
+
+        // Limpiar campos de la fila clonada
+        newRow.querySelectorAll('input, select, textarea').forEach(function(input) {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+        });
+
+        // Obtener el número actual de formularios
+        const currentTotal = parseInt(totalFormsInput.value, 10);
+
+        // Actualizar índices en los atributos name e id
+        newRow.querySelectorAll('[name]').forEach(function(el) {
+            const name = el.name;
+            if (name) {
+                // Reemplazar el índice: -0- por -currentTotal-
+                const newName = name.replace(/-\d+-/, '-' + currentTotal + '-');
+                el.name = newName;
+                if (el.id) {
+                    el.id = el.id.replace(/-\d+-/, '-' + currentTotal + '-');
+                }
+            }
+        });
+
+        // Incrementar TOTAL_FORMS
+        totalFormsInput.value = currentTotal + 1;
+
+        // Añadir la nueva fila
+        tbody.appendChild(newRow);
+    });
+});
+</script>
 {% endblock %}

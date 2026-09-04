@@ -2,15 +2,18 @@
 {% block title %}Lotes de Insumos{% endblock %}
 {% block content %}
 <div class="container-fluid">
-    <h2><i class="fas fa-boxes"></i> Lotes de Insumos</h2>
+    <h2 class="mb-4"><i class="fas fa-boxes me-2"></i>Lotes de Insumos</h2>
     {% if user.rol == 'admin' or user.rol == 'cocinero' %}
-        <a href="{% url 'crear_lote' %}" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Nuevo Lote</a>
+        <a href="{% url 'crear_lote' %}" class="btn btn-primary mb-3">
+            <i class="fas fa-plus me-1"></i> Nuevo Lote
+        </a>
     {% endif %}
-    <div class="card">
-        <div class="card-header">Lista de lotes</div>
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Lista de Lotes</h5>
+        </div>
         <div class="card-body table-responsive">
-            {% if lotes %}
-            <table class="table table-striped">
+            <table class="table table-striped table-hover align-middle">
                 <thead class="table-dark">
                     <tr><th>ID</th><th>Insumo</th><th>Cantidad</th><th>Fecha Caducidad</th><th>Acciones</th></tr>
                 </thead>
@@ -23,18 +26,17 @@
                         <td>{{ lote.fecha_caducidad|date:"d/m/Y"|default:"Sin fecha" }}</td>
                         <td>
                             {% if user.rol == 'admin' or user.rol == 'cocinero' %}
-                                <a href="{% url 'eliminar_lote' lote.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                                <a href="{% url 'eliminar_lote' lote.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </a>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5">No hay lotes registrados.</td></tr>
+                    <tr><td colspan="5" class="text-center">No hay lotes registrados.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
-            {% else %}
-            <div class="alert alert-info">No hay lotes.</div>
-            {% endif %}
         </div>
     </div>
 </div>

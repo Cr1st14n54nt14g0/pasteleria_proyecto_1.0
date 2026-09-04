@@ -51,7 +51,7 @@ class Ventas(models.Model):
  
 class DetalleVenta(models.Model):
     id_venta = models.ForeignKey(Ventas, models.DO_NOTHING, db_column='id_venta')
-    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     ticket = models.CharField(max_length=50, blank=True, null=True)
  
@@ -80,6 +80,7 @@ class Insumos(models.Model):
     cantidad = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     fecha_compra = models.DateField(blank=True, null=True)
     fecha_caducidad = models.DateField(blank=True, null=True)
+    
 
     # Nuevo campo para el estado automático
     ESTADOS_INSUMO = [
@@ -89,13 +90,16 @@ class Insumos(models.Model):
     ]
     estado = models.CharField(max_length=10, choices=ESTADOS_INSUMO, default='disponible', editable=False)
 
+    def __str__(self):
+        return self.nombre_insumo
+
     class Meta:
         db_table = 'insumos'
  
  
 class Inventario(models.Model):
     id_insumo = models.ForeignKey(Insumos, models.DO_NOTHING, db_column='id_insumo')
-    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_caducidad = models.DateField(blank=True, null=True)
  
@@ -132,7 +136,7 @@ class Pedidos(models.Model):
 class DetallePedido(models.Model):
     id_detalle_pedido = models.AutoField(primary_key=True)
     id_pedido = models.ForeignKey(Pedidos, on_delete=models.CASCADE, db_column='id_pedido')
-    id_producto = models.ForeignKey(Productos, on_delete=models.RESTRICT, db_column='id_producto')
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
     cantidad = models.PositiveIntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
@@ -143,7 +147,7 @@ class DetallePedido(models.Model):
  
 class ProductoInsumos(models.Model):
     # Django no soporta claves primarias compuestas, se simula con unique_together
-    id_producto = models.ForeignKey(Productos, models.DO_NOTHING, db_column='id_producto')
+    id_producto = models.ForeignKey(Productos, on_delete=models.CASCADE, db_column='id_producto')
     id_insumo = models.ForeignKey(Insumos, models.DO_NOTHING, db_column='id_insumo')
     cantidad = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
  
@@ -300,3 +304,4 @@ class ConfiguracionCaja(models.Model):
 
     def __str__(self):
         return f"Configuración de caja (máx: {self.max_cajas_activas}, tiempo: {self.tiempo_maximo_minutos} min)"
+
